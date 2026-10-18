@@ -2267,14 +2267,7 @@
     const r = g.round;
     const leading = isLeading(g);
     const partner = (seat + 2) % 4;
-    let partnerCombo = null;
-    for (let i = g.trickPlays.length - 1; i >= 0; i--) {
-      const t = g.trickPlays[i];
-      if (t.seat === partner && !isPassMove(t)) {
-        partnerCombo = t.combo;
-        break;
-      }
-    }
+    const partnerCombo = !leading && r.lastPlayer === partner ? r.lastCombo : null;
     return {
       hand: r.hands[seat],
       previous: leading ? null : r.lastCombo,
@@ -2985,7 +2978,14 @@
     });
     document.addEventListener("gesturestart", (e) => e.preventDefault());
     if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
-      navigator.serviceWorker.register("sw.js").catch(() => {
+      const hadController = !!navigator.serviceWorker.controller;
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!hadController || reloaded) return;
+        reloaded = true;
+        location.reload();
+      });
+      navigator.serviceWorker.register("sw.js").then((reg) => reg.update && reg.update()).catch(() => {
       });
     }
     $("showAll").onchange = render;
