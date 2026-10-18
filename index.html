@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="掼蛋教练">
+<meta name="theme-color" content="#0a2a20">
+<meta name="format-detection" content="telephone=no">
+<title>掼蛋教练 · 四人对局</title>
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script>if (location.protocol !== 'file:') { var l = document.createElement('link'); l.rel = 'manifest'; l.href = 'manifest.json'; document.head.appendChild(l); }</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="title">掼蛋教练</div>
+  <div class="info">
+    <span>打<b id="level">2</b></span>
+    <span class="lv">我<b id="lvUs">2</b>·对<b id="lvThem">2</b></span>
+    <span class="deal">第<b id="dealNo">1</b>副</span>
+    <span class="turnInfo">轮到 <b id="turn">-</b></span>
+  </div>
+  <button id="btnMenu" aria-label="菜单">☰</button>
+  <div id="menu">
+    <label>机器人：<select id="engine">
+      <option value="decide">decide（离线）</option>
+      <option value="jev" disabled>Jev（需电脑本地服务）</option>
+    </select></label>
+    <label>速度：<select id="speed">
+      <option value="1200">慢</option>
+      <option value="700" selected>中</option>
+      <option value="250">快</option>
+    </select></label>
+    <label><input type="checkbox" id="progression" checked> 升级</label>
+    <label><input type="checkbox" id="showAll"> 明牌</label>
+    <button id="btnNew">新比赛</button>
+    <button id="btnShare">分享/复制标记</button>
+    <button id="btnDownload">下载标记（<span id="flagCount">0</span>）</button>
+  </div>
+</header>
+<main id="main">
+  <section id="table">
+    <div class="seat" id="seat2"></div>
+    <div class="seat" id="seat3"></div>
+    <div id="center"><div id="status"></div></div>
+    <div class="seat" id="seat1"></div>
+    <div class="seat" id="seat0"></div>
+  </section>
+  <aside id="side">
+    <div class="panel" id="coachPanel">
+      <div id="hintBox" class="muted">轮到你时点“提示”查看教练建议。</div>
+      <div id="feedback"></div>
+    </div>
+    <details class="panel" id="logPanel">
+      <summary>出牌记录 <small class="muted">（🚩 标记任一手）</small></summary>
+      <ol id="log"></ol>
+    </details>
+  </aside>
+</main>
+<footer id="handArea">
+  <div id="hand"></div>
+  <div id="actions">
+    <button id="btnPlay" class="primary">出牌</button>
+    <button id="btnPass">过</button>
+    <button id="btnHint">提示</button>
+    <button id="btnFlagPos">🚩标记</button>
+    <button id="btnClear">清空</button>
+  </div>
+  <div id="msg"></div>
+</footer>
+
+<div class="modal hidden" id="flagModal">
+  <div class="box">
+    <h3>标记局面</h3>
+    <div id="flagDesc"></div>
+    <div class="radios">
+      <label><input type="radio" name="gold" value="played"> 实际出牌是对的</label>
+      <label><input type="radio" name="gold" value="coach"> 教练建议是对的</label>
+      <label><input type="radio" name="gold" value="unsure" checked> 不确定 / 都不对（备注里写）</label>
+    </div>
+    <textarea id="flagNote" rows="3" placeholder="备注（可选）：例如“应该顶大，下家只剩两张”"></textarea>
+    <div class="row"><button id="flagCancel">取消</button><button id="flagOk" class="primary">保存标记</button></div>
+  </div>
+</div>
+<div class="modal hidden" id="endModal">
+  <div class="box">
+    <h3 id="endTitle">本副结束</h3>
+    <div id="endBody"></div>
+    <div class="row"><button id="endClose">查看牌局</button><button id="btnNext" class="primary">下一副</button></div>
+  </div>
+</div>
+<div class="modal hidden" id="copyModal">
+  <div class="box">
+    <h3>复制标记</h3>
+    <p class="small">长按下面的文字全选并复制，然后粘贴到备忘录、微信或邮件里。</p>
+    <textarea id="copyText" rows="8" readonly></textarea>
+    <div class="row"><button id="copyClose" class="primary">关闭</button></div>
+  </div>
+</div>
+<div id="toast" class="hidden"></div>
+<script src="guandan.bundle.js"></script>
+</body>
+</html>
