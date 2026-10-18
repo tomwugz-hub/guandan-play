@@ -2985,7 +2985,10 @@
         reloaded = true;
         location.reload();
       });
-      navigator.serviceWorker.register("sw.js").then((reg) => reg.update && reg.update()).catch(() => {
+      navigator.serviceWorker.register("sw.js").then((reg) => {
+        if (navigator.onLine && reg.update) reg.update().catch(() => {
+        });
+      }).catch(() => {
       });
     }
     $("showAll").onchange = render;
