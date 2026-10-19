@@ -1406,7 +1406,9 @@
     const ids = new Set((move.cards || []).map((c) => c.id));
     const rest = hand.filter((c) => !ids.has(c.id));
     if (!rest.length) return true;
-    if (minPlays(rest, lv) <= 1) return true;
+    const natCnt = (r) => hand.filter((c) => c.rank === r && (isJokerRank(c.rank) || !isWildCard(c, lv))).length;
+    const breaksNatBomb = !isBombLike(move.combo) && (move.cards || []).some((c) => !isJokerRank(c.rank) && !isWildCard(c, lv) && natCnt(c.rank) >= 4 && natCnt(c.rank) - (move.cards || []).filter((x) => x.rank === c.rank && !isWildCard(x, lv)).length < 4);
+    if (minPlays(rest, lv) <= 1 && !breaksNatBomb) return true;
     {
       const f = moveFinish(move, ctx);
       if (f === "sure") return true;
