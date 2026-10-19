@@ -1511,6 +1511,94 @@
     comps.sort((a, b) => a.order - b.order);
     return { comps, plays: comps.length, cost: r.cost };
   }
+  var SEQ = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
+  function decomposeCounts(hand, lv = "2", cache = /* @__PURE__ */ new Map(), base = null) {
+    if (!(hand == null ? void 0 : hand.length)) return { comps: [], plays: 0, cost: 0 };
+    const cnt = new Array(13).fill(0);
+    let bj = 0, rj = 0, wild = 0;
+    for (const c of hand) {
+      if (c.rank === "BJ") bj++;
+      else if (c.rank === "RJ") rj++;
+      else if (isWildCard(c, lv)) wild++;
+      else cnt[SEQ.indexOf(c.rank)]++;
+    }
+    const cnt0 = base || cnt.slice();
+    const card2 = (r2, n) => Array.from({ length: n }, () => ({ rank: r2, suit: "S" }));
+    const mk = (type, rank, ranksN) => ({ combo: { type, rank }, cards: ranksN.flatMap(([r2, n]) => card2(r2, n)) });
+    const costOf = (type, used) => {
+      if (type === TYPES.BOMB) return 0.3;
+      let cost2 = 1;
+      for (const [i, k] of used) {
+        if (cnt0[i] >= 4) cost2 += 1.5;
+        else if (cnt0[i] > k) cost2 += 0.05;
+      }
+      if (type === TYPES.SINGLE) {
+        const i = used[0][0];
+        if (SEQ[i] === lv) return 0.8;
+        cost2 += 0.01 * Math.max(0, 14 - (i + 2));
+      }
+      return cost2;
+    };
+    const t0 = Date.now();
+    let nodes = 0;
+    const rec = (v) => {
+      let i = 0;
+      while (i < 13 && !v[i]) i++;
+      if (i === 13) return { list: [], cost: 0 };
+      const k = v.join(",");
+      const hit = cache.get(k);
+      if (hit) return hit;
+      nodes++;
+      const opts = [];
+      const c = v[i];
+      const R = SEQ[i];
+      if (c >= 4) opts.push([TYPES.BOMB, R, [[i, c]]]);
+      opts.push([TYPES.SINGLE, R, [[i, 1]]]);
+      if (c >= 2) opts.push([TYPES.PAIR, R, [[i, 2]]]);
+      if (c >= 3) opts.push([TYPES.TRIPLE, R, [[i, 3]]]);
+      for (let j = 0; j < 13; j++) {
+        if (j === i) continue;
+        if (c >= 3 && v[j] >= 2) opts.push([TYPES.FULLHOUSE, R, [[i, 3], [j, 2]]]);
+        if (c >= 2 && v[j] >= 3) opts.push([TYPES.FULLHOUSE, SEQ[j], [[j, 3], [i, 2]]]);
+      }
+      if (i + 4 < 13 && [1, 2, 3, 4].every((d) => v[i + d] >= 1)) opts.push([TYPES.STRAIGHT, SEQ[i + 4], [0, 1, 2, 3, 4].map((d) => [i + d, 1])]);
+      if (i + 2 < 13 && c >= 2 && v[i + 1] >= 2 && v[i + 2] >= 2) opts.push([TYPES.PAIR_SEQ, SEQ[i + 2], [0, 1, 2].map((d) => [i + d, 2])]);
+      if (i + 1 < 13 && c >= 3 && v[i + 1] >= 3) opts.push([TYPES.TRIPLE_SEQ, SEQ[i + 1], [[i, 3], [i + 1, 3]]]);
+      let best = null;
+      for (const [type, rank, used] of opts) {
+        if (best && (Date.now() - t0 > 30 || nodes > 2e4)) break;
+        const w = v.slice();
+        for (const [j, n] of used) w[j] -= n;
+        const r2 = rec(w);
+        const cost2 = r2.cost + costOf(type, used);
+        if (!best || cost2 < best.cost - 1e-9) best = { list: [mk(type, rank, used.map(([j, n]) => [SEQ[j], n])), ...r2.list], cost: cost2 };
+      }
+      cache.set(k, best);
+      return best;
+    };
+    const r = rec(cnt);
+    const list = r.list.slice();
+    let cost = r.cost;
+    if (bj === 2 && rj === 2) {
+      list.push({ combo: { type: TYPES.BOMB, rank: "RJ" }, cards: [...card2("BJ", 2), ...card2("RJ", 2)] });
+      cost += 0.3;
+    } else for (const [R, n] of [["BJ", bj], ["RJ", rj]]) {
+      if (n === 2) {
+        list.push(mk(TYPES.PAIR, R, [[R, 2]]));
+        cost += 0.8;
+      } else if (n === 1) {
+        list.push(mk(TYPES.SINGLE, R, [[R, 1]]));
+        cost += 0.8;
+      }
+    }
+    for (let w = 0; w < wild; w++) {
+      list.push({ combo: { type: TYPES.SINGLE, rank: lv }, cards: [{ rank: lv, suit: "H" }] });
+      cost += 0.8;
+    }
+    const comps = list.map((m) => ({ move: m, key: comboKey(m), role: roleOf(m, lv), order: orderKey(m, lv) }));
+    comps.sort((a, b) => a.order - b.order);
+    return { comps, plays: comps.length, cost, counts: cnt0 };
+  }
 
   // policy/index.js
   var LA_CACHE = /* @__PURE__ */ new WeakMap();
@@ -1603,7 +1691,7 @@
     return partner.type === prev.type && ((_a = partner.rank) != null ? _a : null) === ((_b = prev.rank) != null ? _b : null);
   }
   function scoreMove(move, ctx, allMoves) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga;
     const tags = [];
     if (isForbidden(move, ctx, allMoves)) return { score: -1e6, tags: ["forbidden"] };
     const struct = ctx._struct || detectStructures(ctx.hand || [], ctx.levelRank);
@@ -1711,8 +1799,9 @@
       return m && !isPass(m) && !isBombLike(m.combo) && !touchesBomb0(m) && (((_a2 = m.cards) == null ? void 0 : _a2.length) || 0) > enemyShort;
     };
     const shapeFirst = ctx.leading && enemyShort <= 2 && (partnerCountS >= 3 || partnerCountS === 0 || partnerCountS === 2 && enemyShort <= 1) && (allMoves || []).some(unfollowable);
+    const bigPlanLead = ctx.leading && R7("R7_NOSB", 1) && !!bigPlanFor(ctx);
     if (ctx.leading && hasBomb && !shapeFirst) {
-      if (isOrphanSingleMove(move, byRank) && !isControlRank(move.combo.rank, levelRank)) {
+      if (!bigPlanLead && isOrphanSingleMove(move, byRank) && !isControlRank(move.combo.rank, levelRank)) {
         score += 60;
         tags.push("holdBombLead");
       }
@@ -1785,7 +1874,7 @@
         tags.push("keepShape");
       }
     }
-    if (ctx.leading && hasBomb && isOrphanSingleMove(move, byRank) && !isControlRank(move.combo.rank, levelRank)) {
+    if (ctx.leading && !bigPlanLead && hasBomb && isOrphanSingleMove(move, byRank) && !isControlRank(move.combo.rank, levelRank)) {
       const strength = singleStrength(move.combo.rank, levelRank);
       score += Math.max(0, 12 - strength) * 2;
     }
@@ -1870,7 +1959,22 @@
       score += winThenGood ? 40 : 20;
       tags.push("tempoTake");
     }
-    if (!ctx.leading && enemyShort >= 4 && ((_J = move.combo) == null ? void 0 : _J.type) === TYPES.PAIR && (move.combo.rank === levelRank || isJokerRank(move.combo.rank)) && !emptiesHand(move, ctx.hand) && !winThenGood) {
+    if (R7("R7_CT", 1) && !ctx.leading && ctx.previous && !partner && !toBeatPartner && !isPass(move) && !emptiesHand(move, ctx.hand) && hand.length <= 12 && enemyShort >= 3 && (((_J = move.combo) == null ? void 0 : _J.type) === TYPES.SINGLE || ((_K = move.combo) == null ? void 0 : _K.type) === TYPES.PAIR) && ctx.previous.type === move.combo.type && (move.combo.rank === levelRank || isJokerRank(move.combo.rank)) && !usesWild(move, levelRank) && enemyShort <= R7("R7_CTE", 13) && // 只奖励“最便宜够用”的控制牌：有更小的级牌/王同型能压就不加（例 dev-r6 R146、dev-real d001）
+    !(R7("R7_CTC", 1) && (allMoves || []).some((m) => {
+      var _a2;
+      return !isPass(m) && ((_a2 = m.combo) == null ? void 0 : _a2.type) === move.combo.type && !isBombLike(m.combo) && (m.combo.rank === levelRank || isJokerRank(m.combo.rank)) && !usesWild(m, levelRank) && singleStrength(m.combo.rank, levelRank) < singleStrength(move.combo.rank, levelRank);
+    }))) {
+      const plan = handPlanFor(ctx);
+      const comp = plan && plan.comps.find((c) => c.key === comboKey(move));
+      if (comp && comp.role === "control") {
+        const p = winProb(move, ctx);
+        if (p >= R7("R7_CTP", 0.85)) {
+          score += R7("R7_CTB", 40);
+          tags.push("controlTempo");
+        }
+      }
+    }
+    if (!ctx.leading && enemyShort >= 4 && ((_L = move.combo) == null ? void 0 : _L.type) === TYPES.PAIR && (move.combo.rank === levelRank || isJokerRank(move.combo.rank)) && !emptiesHand(move, ctx.hand) && !winThenGood) {
       score -= 80;
       tags.push("keepControlPair");
     }
@@ -1901,7 +2005,7 @@
         tags.push("passiveEarly");
       }
     }
-    if (!ctx.leading && !isPass(move) && ((_K = move.combo) == null ? void 0 : _K.type) === TYPES.SINGLE && ((_L = ctx.previous) == null ? void 0 : _L.type) === TYPES.SINGLE && !emptiesHand(move, ctx.hand)) {
+    if (!ctx.leading && !isPass(move) && ((_M = move.combo) == null ? void 0 : _M.type) === TYPES.SINGLE && ((_N = ctx.previous) == null ? void 0 : _N.type) === TYPES.SINGLE && !emptiesHand(move, ctx.hand)) {
       const restN = minPlays(restAfter(hand, move), levelRank);
       if (restN <= 1) {
         score += 40 * winProb(move, ctx);
@@ -1919,7 +2023,7 @@
           tags.push("keepFinish");
         }
       }
-      if ((enemyShort >= 4 || enemyShort >= 3 && (((_M = move.cards) == null ? void 0 : _M.length) || 0) >= 3) && usesWild(move, levelRank) && !winThenGood) {
+      if ((enemyShort >= 4 || enemyShort >= 3 && (((_O = move.cards) == null ? void 0 : _O.length) || 0) >= 3) && usesWild(move, levelRank) && !winThenGood) {
         score -= 100;
         tags.push("keepWild");
       } else if (enemyShort >= 2 && wildFillers(move, levelRank) > 0) {
@@ -1938,7 +2042,7 @@
       if (usesWild(move, levelRank)) {
         score -= 60;
         tags.push("leadNoWild");
-      } else if (((_N = move.combo) == null ? void 0 : _N.type) === TYPES.FULLHOUSE && move.combo.rank === levelRank) {
+      } else if (((_P = move.combo) == null ? void 0 : _P.type) === TYPES.FULLHOUSE && move.combo.rank === levelRank) {
         score -= 30;
         tags.push("leadNoLevelTriple");
       }
@@ -1951,24 +2055,24 @@
         }
       );
       const hasOrphan = [...byRank.values()].some((n) => n === 1);
-      const nextEnemyN = (_P = seatCounts[(((_O = ctx.seat) != null ? _O : 0) + 1) % 4]) != null ? _P : 27;
+      const nextEnemyN = (_R = seatCounts[(((_Q = ctx.seat) != null ? _Q : 0) + 1) % 4]) != null ? _R : 27;
       const feedOk1 = partnerCount === 1 && (enemyShort >= 2 || nextEnemyN >= 2);
       const feedPairAvail = partnerCount === 2 && enemyShort >= 3 && (allMoves || []).some((m) => {
         var _a2;
         return ((_a2 = m.combo) == null ? void 0 : _a2.type) === TYPES.PAIR && [2, 3].includes(byRank.get(m.combo.rank) || 0) && !usesWild(m, levelRank) && singleStrength(m.combo.rank, levelRank) <= 10;
       });
-      if (feedOk1 && ((_Q = move.combo) == null ? void 0 : _Q.type) === TYPES.SINGLE) {
+      if (feedOk1 && ((_S = move.combo) == null ? void 0 : _S.type) === TYPES.SINGLE) {
         const lowOrphans = [...byRank.entries()].filter(([r, n]) => n === 1 && singleStrength(r, levelRank) <= 8);
         const isOrphan = isOrphanSingleMove(move, byRank);
         score += 260 - cappedStrength(move.combo.rank) * 6;
         if (lowOrphans.length && !isOrphan) score -= 120;
         tags.push("feedPartner");
       }
-      if (feedPairAvail && ((_R = move.combo) == null ? void 0 : _R.type) === TYPES.PAIR && [2, 3].includes(byRank.get(move.combo.rank) || 0) && !usesWild(move, levelRank)) {
+      if (feedPairAvail && ((_T = move.combo) == null ? void 0 : _T.type) === TYPES.PAIR && [2, 3].includes(byRank.get(move.combo.rank) || 0) && !usesWild(move, levelRank)) {
         score += 150 - cappedStrength(move.combo.rank) * 5 - ((byRank.get(move.combo.rank) || 0) === 3 ? 35 : 0) + 40;
         tags.push("feedPartnerPair");
       }
-      if (hand.length === 2 && partnerCount !== 1 && ((_S = move.combo) == null ? void 0 : _S.type) === TYPES.SINGLE && !(allMoves || []).some((m) => emptiesHand(m, ctx.hand))) {
+      if (hand.length === 2 && partnerCount !== 1 && ((_U = move.combo) == null ? void 0 : _U.type) === TYPES.SINGLE && !(allMoves || []).some((m) => emptiesHand(m, ctx.hand))) {
         const other = hand.find((c) => !move.cards.some((x) => x.id === c.id));
         if (other && singleStrength(move.combo.rank, levelRank) > singleStrength(other.rank, levelRank)) {
           score += 200;
@@ -1976,29 +2080,29 @@
         }
       }
       if (enemyShort === 2 && partnerCount > 2 && !(allMoves || []).some((m) => emptiesHand(m, ctx.hand))) {
-        if (((_T = move.combo) == null ? void 0 : _T.type) === TYPES.PAIR) score -= 70;
-        if (((_U = move.combo) == null ? void 0 : _U.type) === TYPES.SINGLE && isOrphanSingleMove(move, byRank) && !(allMoves || []).some((m) => {
+        if (((_V = move.combo) == null ? void 0 : _V.type) === TYPES.PAIR) score -= 70;
+        if (((_W = move.combo) == null ? void 0 : _W.type) === TYPES.SINGLE && isOrphanSingleMove(move, byRank) && !(allMoves || []).some((m) => {
           var _a2;
           return !isBombLike(m.combo) && (((_a2 = m.cards) == null ? void 0 : _a2.length) || 0) >= 3;
         })) score += 30;
         tags.push("vsTwoNoPair");
       }
-      if (enemyShort === 2 && partnerCount !== 1 && !isBombLike(move.combo) && (((_V = move.cards) == null ? void 0 : _V.length) || 0) >= 3 && !(allMoves || []).some((m) => emptiesHand(m, ctx.hand))) {
+      if (enemyShort === 2 && partnerCount !== 1 && !isBombLike(move.combo) && (((_X = move.cards) == null ? void 0 : _X.length) || 0) >= 3 && !(allMoves || []).some((m) => emptiesHand(m, ctx.hand))) {
         score += 90;
         tags.push("unfollowableVsTwo");
       }
-      if (enemyShort >= 4 && partnerCount !== 1 && !feedPairAvail && isOrphanSingleMove(move, byRank) && singleStrength(move.combo.rank, levelRank) <= 8) {
+      if (enemyShort >= 4 && partnerCount !== 1 && !feedPairAvail && !bigPlanLead && isOrphanSingleMove(move, byRank) && singleStrength(move.combo.rank, levelRank) <= 8) {
         score += 60 + (14 - singleStrength(move.combo.rank, levelRank)) * 3;
         tags.push("smallFirst");
       }
-      if (enemyShort <= 1 && !feedOk1 && !poolNonSingle && ((_W = move.combo) == null ? void 0 : _W.type) === TYPES.SINGLE) {
+      if (enemyShort <= 1 && !feedOk1 && !poolNonSingle && ((_Y = move.combo) == null ? void 0 : _Y.type) === TYPES.SINGLE) {
         score += cappedStrength(move.combo.rank) * 12 + 55;
         if (isControlRank(move.combo.rank, levelRank)) score += 55;
         tags.push("bigFirstVsLast");
       }
       if (enemyShort === 2 && !hasOrphan && partnerCount !== 1) {
-        if (((_X = move.combo) == null ? void 0 : _X.type) === TYPES.SINGLE) score += 120;
-        if (((_Y = move.combo) == null ? void 0 : _Y.type) === TYPES.PAIR) score -= 60;
+        if (((_Z = move.combo) == null ? void 0 : _Z.type) === TYPES.SINGLE) score += 120;
+        if (((__ = move.combo) == null ? void 0 : __.type) === TYPES.PAIR) score -= 60;
         tags.push("vsTwoSingle");
       }
     }
@@ -2015,7 +2119,7 @@
     if (!isPass(move) && !emptiesHand(move, ctx.hand)) {
       let fin = moveFinish(move, ctx, laCache(ctx));
       if (fin && ctx.leading && isBombLike(move.combo) && enemyShort >= 6) fin = null;
-      const pc1 = (ctx.remainingSeatCounts || [])[(((_Z = ctx.seat) != null ? _Z : 0) + 2) % 4];
+      const pc1 = (ctx.remainingSeatCounts || [])[(((_$ = ctx.seat) != null ? _$ : 0) + 2) % 4];
       if (fin === "likely" && ctx.leading && pc1 === 1) fin = null;
       if (fin) {
         score += fin === "sure" ? 160 : fin === "bombBack" ? 115 : 100;
@@ -2033,9 +2137,9 @@
       }
     }
     if (!ctx.leading && ctx.previous && isPass(move) && partner) {
-      const seatP = (__ = ctx.seat) != null ? __ : 0;
+      const seatP = (_aa = ctx.seat) != null ? _aa : 0;
       const cP = ctx.remainingSeatCounts || [];
-      const sizeP = ((_aa = (_$ = ctx.previous) == null ? void 0 : _$.cards) == null ? void 0 : _aa.length) || ((_ba = ctx.previous) == null ? void 0 : _ba.size) || 1;
+      const sizeP = ((_ca = (_ba = ctx.previous) == null ? void 0 : _ba.cards) == null ? void 0 : _ca.length) || ((_da = ctx.previous) == null ? void 0 : _da.size) || 1;
       const nextE = cP[(seatP + 1) % 4];
       const hasBlock = (allMoves || []).some((m) => !isPass(m) && !isBombLike(m.combo));
       if (nextE > 0 && nextE === sizeP && hasBlock) {
@@ -2055,7 +2159,7 @@
           const wildM = usesWild(move, levelRank);
           let k = 1;
           if (partner) {
-            const sizeP = ((_da = (_ca = ctx.previous) == null ? void 0 : _ca.cards) == null ? void 0 : _da.length) || ((_ea = ctx.previous) == null ? void 0 : _ea.size) || 1;
+            const sizeP = ((_fa = (_ea = ctx.previous) == null ? void 0 : _ea.cards) == null ? void 0 : _fa.length) || ((_ga = ctx.previous) == null ? void 0 : _ga.size) || 1;
             const pw = winProb({ combo: ctx.previous, cards: new Array(sizeP).fill(null) }, ctx);
             k = Math.max(0, Math.min(1, (1 - pw) / 0.5));
           }
@@ -2128,16 +2232,38 @@
     if (!pc.has("__plan")) pc.set("__plan", decompose(ctx.hand || [], ctx.levelRank || "2", pc));
     return pc.get("__plan");
   }
+  var R7 = (k, d) => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a[k] : void 0;
+    return v == null ? d : Number(v);
+  };
+  var BIG_PLAN_CACHE = /* @__PURE__ */ new WeakMap();
+  function bigPlanCache(ctx) {
+    let c = BIG_PLAN_CACHE.get(ctx);
+    if (!c) {
+      c = /* @__PURE__ */ new Map();
+      BIG_PLAN_CACHE.set(ctx, c);
+    }
+    return c;
+  }
+  function bigPlanFor(ctx) {
+    const hand = ctx.hand || [];
+    if (hand.length <= 14 || !R7("R7_PLAN", 1)) return null;
+    const pc = bigPlanCache(ctx);
+    if (!pc.has("__plan")) pc.set("__plan", decomposeCounts(hand, ctx.levelRank || "2", pc));
+    return pc.get("__plan");
+  }
   function planLeadScore(move, ctx, allMoves, { enemyShort, partnerCount, byRank, levelRank }) {
     var _a, _b, _c, _d, _e, _f;
     const tags = [];
     let score = 0;
     const hand = ctx.hand || [];
-    const plan = handPlanFor(ctx);
+    const big = bigPlanFor(ctx);
+    const plan = big || handPlanFor(ctx);
     if (!plan || plan.plays < 2) return { score, tags };
-    const cache = planCache(ctx);
+    const cache = big ? bigPlanCache(ctx) : planCache(ctx);
     const rest = restAfter(hand, move);
-    const rp = decompose(rest, levelRank, cache);
+    const rp = big ? decomposeCounts(rest, levelRank, cache, big.counts) : decompose(rest, levelRank, cache);
     if (rp) {
       const one = decompose(move.cards, levelRank, cache);
       const moveCost = isBombLike(move.combo) ? 0.3 : one && one.plays === 1 ? one.cost : 1;
@@ -2157,8 +2283,8 @@
       return i % 2 !== ((_a2 = ctx.seat) != null ? _a2 : 0) % 2;
     }).filter((c) => c > 0), 0);
     if (enemyShort >= 3 && enemyShort <= 4 && !partnerFeeding && isComp) {
-      const big = weak.filter((c) => c.move.cards.length > enemyMax);
-      if (big.length && comboKey(big.sort((x, y) => y.move.cards.length - x.move.cards.length)[0].move) === comboKey(move)) {
+      const big2 = weak.filter((c) => c.move.cards.length > enemyMax);
+      if (big2.length && comboKey(big2.sort((x, y) => y.move.cards.length - x.move.cards.length)[0].move) === comboKey(move)) {
         score += 60;
         tags.push("planUnfollowable");
       }
@@ -2171,7 +2297,7 @@
       });
       const first = longU.length ? longU[0] : weak[0];
       if (first.key === comboKey(move)) {
-        score += longU.length ? 100 : 45;
+        score += longU.length ? big ? R7("R7_UNIT", 100) : 100 : big ? R7("R7_WEAK", 45) : 45;
         tags.push(longU.length ? "planUnitFirst" : "planWeakFirst");
       } else if (((_c = comps.find((c) => c.key === comboKey(move))) == null ? void 0 : _c.role) === "control" && weak.length >= 1) {
         score -= 20;
