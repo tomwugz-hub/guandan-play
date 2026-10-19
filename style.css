@@ -140,3 +140,38 @@ main { flex: 1; display: flex; min-height: 0; overflow: auto; -webkit-overflow-s
   #topbar .title { display: none; }
   #topbar .info { gap: 7px; font-size: 14px; flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
 }
+
+/* ===== 进贡 ===== */
+#tribPanel { background: #123f30; border: 2px solid #ffd76a; border-radius: 10px; padding: 6px 10px; margin: 4px 0 2px; font-size: 14px; animation: tribPop .25s ease-out; }
+#tribPanel.hidden { display: none; }
+#tribPanel .tribHead { display: flex; align-items: center; gap: 10px; color: #ffd76a; font-size: 16px; }
+#tribPanel .lvBadge { font-size: 12px; color: #cde; background: #2d4f6a; border-radius: 10px; padding: 0 8px; }
+#tribPanel button.link { margin-left: auto; background: none; border: none; color: #9fd; text-decoration: underline; padding: 4px 6px; min-height: 32px; }
+#tribPanel .tribBody { display: flex; flex-direction: column; gap: 3px; margin: 4px 0; }
+#tribPanel .tribRow { display: block; line-height: 1.5; }
+#tribPanel .tribRow .card.small { display: inline-block; vertical-align: middle; margin: 1px 3px; }
+#tribPanel .anim { animation: tribIn .45s ease-out both; }
+#tribPanel .card.fly { animation: tribFly .6s ease-out both; }
+#tribPanel .tribBtns { display: flex; gap: 8px; justify-content: flex-end; }
+#tribPanel .tribBtns button { min-height: 44px; min-width: 110px; font-size: 16px; }
+body.tribOn #actions { display: none; }
+#hand .card.dim { filter: brightness(.55); }
+#hand .card.elig { box-shadow: 0 0 0 2px #3fd17a, 1px 1px 2px #0006; }
+#hand .card.elig.sel { box-shadow: 0 0 0 3px #ffcf4a, 1px 1px 3px #000a; }
+#hand .card.tribGive { transform: translateY(-14px); box-shadow: 0 0 0 3px #ff7a59, 1px 1px 3px #000a; animation: tribPulse 1s ease-in-out infinite alternate; }
+#hand .card.newCard { box-shadow: 0 0 0 3px #59c2ff, 1px 1px 3px #000a; }
+#endBody .tribNext { color: #6a4b00; background: #fff3c8; border-radius: 6px; padding: 4px 8px; }
+.rules p { margin: 6px 0; line-height: 1.45; }
+@keyframes tribPop { from { transform: scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes tribIn { from { transform: translateX(-24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes tribFly { from { transform: translate(-30px, -30px) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes tribPulse { from { box-shadow: 0 0 0 2px #ff7a59; } to { box-shadow: 0 0 0 5px #ff7a59; } }
+@media (max-height: 500px) and (orientation: landscape) {
+  #tribPanel { padding: 3px 8px; font-size: 13px; margin: 2px 0; }
+  #tribPanel .tribHead { font-size: 14px; }
+  #tribPanel .tribBody { flex-direction: row; flex-wrap: wrap; gap: 2px 14px; margin: 2px 0; }
+  #tribPanel .tribBtns { position: absolute; right: 10px; top: 4px; }
+  #tribPanel { position: relative; padding-right: 250px; }
+  #tribPanel .tribBtns button { min-height: 36px; min-width: 96px; font-size: 15px; }
+}
+body.tribOn #toast { bottom: auto; top: calc(70px + env(safe-area-inset-top)); }

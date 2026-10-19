@@ -37,6 +37,7 @@
     </select></label>
     <label><input type="checkbox" id="progression" checked> 升级</label>
     <label><input type="checkbox" id="showAll"> 明牌</label>
+    <button id="btnRules">进贡规则</button>
     <button id="btnNew">新比赛</button>
     <button id="btnShare">分享/复制标记</button>
     <button id="btnDownload">下载标记（<span id="flagCount">0</span>）</button>
@@ -62,6 +63,7 @@
   </aside>
 </main>
 <footer id="handArea">
+  <div id="tribPanel" class="hidden" aria-live="polite"></div>
   <div id="hand"></div>
   <div id="actions">
     <button id="btnPlay" class="primary">出牌</button>
@@ -99,6 +101,21 @@
     <p class="small">长按下面的文字全选并复制，然后粘贴到备忘录、微信或邮件里。</p>
     <textarea id="copyText" rows="8" readonly></textarea>
     <div class="row"><button id="copyClose" class="primary">关闭</button></div>
+  </div>
+</div>
+<div class="modal hidden" id="rulesModal">
+  <div class="box">
+    <h3>进贡 / 还贡 / 抗贡（主流规则）</h3>
+    <div class="rules small">
+      <p><b>何时进贡：</b>从每场比赛的第二副起，按上一副名次（头游、二游、三游、末游）。</p>
+      <p><b>单贡：</b>末游把手里<b>最大的一张牌</b>（大王、小王都算；<b>红桃级牌（逢人配）除外</b>）交给头游；头游还一张 <b>10 或以下</b>的牌给末游。由<b>末游先出</b>。头游与末游是同队时也一样。</p>
+      <p><b>双下（对方双上）：</b>三游、末游各进贡一张最大的牌，<b>大的给头游、小的给二游</b>；两张一样大时，<b>头游的下家</b>把贡给头游、另一位给二游。头游、二游各还一张 10 或以下的牌给向自己进贡的人。由<b>进贡给头游的人先出</b>。</p>
+      <p><b>抗贡：</b>单贡时末游手里有<b>两张大王</b>；双下时三游+末游<b>合计两张大王</b>（一人两张或各一张）→ 本副不进贡也不还贡，<b>头游先出</b>。</p>
+      <p><b>还贡的牌：</b>自然点 2–10（含 10）。王和逢人配不能还；不是红桃的级牌按自然点算（如打 5 时黑桃 5 可还）。手里没有 10 或以下的牌时，还最小的一张。</p>
+      <p><b>公开与否：</b>贡牌亮给大家看；还贡是暗还（只有还的人和收的人知道；打开“明牌”可看到）。</p>
+      <p><b>升级：</b>双上升 3 级，头游+三游升 2 级，头游+末游升 1 级；下一副打赢家的级。打 A 时拿头游且对家不是末游即过 A、整场获胜（之后新比赛从 2 打起，不进贡）。</p>
+    </div>
+    <div class="row"><button id="rulesClose" class="primary">知道了</button></div>
   </div>
 </div>
 <div id="toast" class="hidden"></div>

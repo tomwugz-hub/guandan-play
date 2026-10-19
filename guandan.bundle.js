@@ -399,55 +399,6 @@
     return c > 0;
   }
 
-  // engine/tribute.js
-  function teamOf(seat) {
-    return seat % 2;
-  }
-  function finishRoles(finishOrder) {
-    if (!finishOrder || finishOrder.length !== 4) throw new Error("finishOrder 必须 4 个座位");
-    const [head, second, third, tail] = finishOrder;
-    return { head, second, third, tail };
-  }
-  function isDoubleDown(finishOrder) {
-    const { head, second } = finishRoles(finishOrder);
-    return teamOf(head) === teamOf(second);
-  }
-  function tributePlan(finishOrder, { officialDoubleTribute = false } = {}) {
-    const { head, second, third, tail } = finishRoles(finishOrder);
-    if (isDoubleDown(finishOrder)) {
-      if (officialDoubleTribute) {
-        return {
-          count: 2,
-          pairs: [
-            { from: third, to: head },
-            { from: tail, to: second }
-          ],
-          doubleDown: true,
-          officialDoubleTribute: true,
-          reason: "官方双下双贡：两名下游分别向上游方进贡（大贡归头游）"
-        };
-      }
-      return { count: 0, pairs: [], doubleDown: true, reason: "双下不进贡" };
-    }
-    if (teamOf(head) === teamOf(tail)) {
-      return {
-        count: 1,
-        pairs: [{ from: tail, to: head }],
-        doubleDown: false,
-        reason: "头游+末游同队，末游进贡头游"
-      };
-    }
-    return {
-      count: 2,
-      pairs: [
-        { from: tail, to: head },
-        { from: third, to: second }
-      ],
-      doubleDown: false,
-      reason: "头游+三游同队，末游进贡头游、三游进贡二游"
-    };
-  }
-
   // engine/rulesets.js
   var RULESETS = {
     SUQIAN: "suqian",
@@ -508,70 +459,6 @@
       tricks: [],
       tributeEatenByHead: false
     };
-  }
-  function applyGameResult(match, finishOrder) {
-    const cfg = match.config;
-    const head = finishOrder[0];
-    const winTeam = teamOf(head);
-    const loseTeam = 1 - winTeam;
-    const dd = isDoubleDown(finishOrder);
-    const atA = match.teamLevel[winTeam] === "A" || match.levelRank === "A";
-    const tribute = tributePlan(finishOrder, {
-      officialDoubleTribute: cfg.id === RULESETS.OFFICIAL_2022
-    });
-    let message = "";
-    let passA = false;
-    let resetTo2 = false;
-    let headEatsTribute = false;
-    if (cfg.passARequiresDoubleDown && match.levelRank === "A") {
-      if (dd && winTeam === match.defenderTeam) {
-        passA = true;
-        match.matchOver = true;
-        match.winnerTeam = winTeam;
-        message = "双下过 A，本局胜利";
-      } else if (dd && winTeam !== match.defenderTeam) {
-        passA = true;
-        match.matchOver = true;
-        match.winnerTeam = winTeam;
-        message = "对方双下过 A";
-      } else if (winTeam === match.defenderTeam && !dd) {
-        resetTo2 = true;
-        headEatsTribute = true;
-        match.teamLevel = ["2", "2"];
-        match.levelRank = "2";
-        match.defenderTeam = winTeam;
-        tribute.count = 0;
-        tribute.pairs = [];
-        tribute.eatenByHead = true;
-        message = "过 A 未双下，回打 2，头游吃贡";
-      } else {
-        resetTo2 = true;
-        match.teamLevel = ["2", "2"];
-        match.levelRank = "2";
-        match.defenderTeam = winTeam;
-        message = "过 A 失败，台上对方打 2";
-      }
-    } else {
-      const steps = dd ? 2 : 1;
-      match.teamLevel[winTeam] = bumpLevel(match.teamLevel[winTeam], steps);
-      match.levelRank = match.teamLevel[winTeam];
-      match.defenderTeam = winTeam;
-      if (cfg.endMatchOnAnyWinAtA && (match.levelRank === "A" || atA)) {
-        passA = true;
-        match.matchOver = true;
-        match.winnerTeam = winTeam;
-        message = "官方规则：打 A 获胜即过 A（不必双下）";
-      } else {
-        message = dd ? `双下，升 ${steps} 级` : `升 ${steps} 级`;
-      }
-    }
-    match.history.push({ finishOrder, tribute, passA, resetTo2, message });
-    return { match, tribute, passA, resetTo2, headEatsTribute, message };
-  }
-  function bumpLevel(cur, steps) {
-    let i = RANKS.indexOf(cur);
-    i = Math.min(RANKS.length - 1, i + steps);
-    return RANKS[i];
   }
 
   // engine/legal.js
@@ -2413,6 +2300,142 @@
     });
   }
 
+  // engine/tributeStd.js
+  var teamOf2 = (s) => s % 2;
+  var NAT_LE10 = ["2", "3", "4", "5", "6", "7", "8", "9", "10"];
+  var SUIT_ORD = { S: 0, H: 1, C: 2, D: 3, J: 4 };
+  function tributeCard(hand, lv) {
+    var _a, _b;
+    let best = null;
+    for (const c of hand || []) {
+      if (isWildCard(c, lv)) continue;
+      if (!best) {
+        best = c;
+        continue;
+      }
+      const d = singleStrength(c.rank, lv) - singleStrength(best.rank, lv);
+      if (d > 0 || d === 0 && (((_a = SUIT_ORD[c.suit]) != null ? _a : 9) < ((_b = SUIT_ORD[best.suit]) != null ? _b : 9) || c.suit === best.suit && c.id < best.id)) best = c;
+    }
+    return best;
+  }
+  function isReturnEligible(c, lv) {
+    return !!c && !isJokerRank(c.rank) && !isWildCard(c, lv) && NAT_LE10.includes(c.rank);
+  }
+  function returnOptions(hand, lv) {
+    const el = (hand || []).filter((c) => isReturnEligible(c, lv));
+    if (el.length) return { cards: el, fallback: false };
+    const pool = (hand || []).filter((c) => !isWildCard(c, lv));
+    const src = pool.length ? pool : hand || [];
+    if (!src.length) return { cards: [], fallback: true };
+    const min = Math.min(...src.map((c) => singleStrength(c.rank, lv)));
+    return { cards: src.filter((c) => singleStrength(c.rank, lv) === min), fallback: true };
+  }
+  function isLegalReturn(c, hand, lv) {
+    return returnOptions(hand, lv).cards.some((x) => x.id === (c == null ? void 0 : c.id));
+  }
+  function countRJ(hand) {
+    return (hand || []).filter((c) => c.rank === JOKER_RED).length;
+  }
+  function planTribute(prevOrder, hands, lv) {
+    if (!prevOrder || prevOrder.length !== 4) return { kind: "none", resisted: false, gives: [], leader: null, head: null, reason: "首副不进贡" };
+    const [head, second, third, tail] = prevOrder;
+    const dd = teamOf2(head) === teamOf2(second);
+    if (!dd) {
+      if (countRJ(hands[tail]) >= 2) return { kind: "single", resisted: true, gives: [], leader: head, head, resistBy: [tail], reason: "末游有两张大王，抗贡；头游先出" };
+      const card2 = tributeCard(hands[tail], lv);
+      return { kind: "single", resisted: false, gives: [{ from: tail, to: head, card: card2 }], leader: tail, head, reason: "末游向头游进贡，末游先出" };
+    }
+    const rj3 = countRJ(hands[third]), rj4 = countRJ(hands[tail]);
+    if (rj3 + rj4 >= 2) return { kind: "double", resisted: true, gives: [], leader: head, head, resistBy: [third, tail].filter((s) => countRJ(hands[s]) > 0), reason: "双下方合计两张大王，抗贡；头游先出" };
+    const a = { from: third, card: tributeCard(hands[third], lv) };
+    const b = { from: tail, card: tributeCard(hands[tail], lv) };
+    const sa = singleStrength(a.card.rank, lv), sb = singleStrength(b.card.rank, lv);
+    let big, small, tie = false;
+    if (sa !== sb) [big, small] = sa > sb ? [a, b] : [b, a];
+    else {
+      tie = true;
+      const hn = (head + 1) % 4;
+      [big, small] = a.from === hn ? [a, b] : [b, a];
+    }
+    return {
+      kind: "double",
+      resisted: false,
+      tie,
+      gives: [{ from: big.from, to: head, card: big.card }, { from: small.from, to: second, card: small.card }],
+      leader: big.from,
+      head,
+      reason: tie ? "双下双贡：贡牌一样大，头游下家进贡头游并先出" : "双下双贡：大贡归头游、小贡归二游，进贡大牌者先出"
+    };
+  }
+  function applyGives(hands, plan) {
+    const next = hands.map((h) => h.slice());
+    for (const g of plan.gives) {
+      next[g.from] = next[g.from].filter((c) => c.id !== g.card.id);
+      next[g.to] = next[g.to].concat(g.card);
+    }
+    return next;
+  }
+  function minReturn(hand, lv) {
+    const o = returnOptions(hand, lv).cards;
+    return o.reduce((b, c) => !b || singleStrength(c.rank, lv) < singleStrength(b.rank, lv) ? c : b, null);
+  }
+  function newStdMatch(startLevel = "2") {
+    return { teamLevel: [startLevel, startLevel], level: startLevel, levelTeam: null, matchOver: false, winnerTeam: null, prevOrder: null };
+  }
+  function bump(lv, n) {
+    return RANKS[Math.min(RANKS.length - 1, RANKS.indexOf(lv) + n)];
+  }
+  function stepsFor(order) {
+    const t = teamOf2(order[0]);
+    return teamOf2(order[1]) === t ? 3 : teamOf2(order[2]) === t ? 2 : 1;
+  }
+  function applyStdResult(m, order) {
+    const winTeam = teamOf2(order[0]);
+    const steps = stepsFor(order);
+    const before = m.teamLevel.slice();
+    const playingOwnA = m.level === "A" && m.teamLevel[winTeam] === "A" && (m.levelTeam === winTeam || m.levelTeam == null);
+    let passA = false;
+    let message;
+    if (playingOwnA && steps >= 2) {
+      passA = true;
+      m.matchOver = true;
+      m.winnerTeam = winTeam;
+      message = `${steps === 3 ? "双上" : "头游+三游"}，过 A，整场胜利`;
+    } else if (playingOwnA) {
+      message = "打 A 头游但对家末游，未过 A，继续打 A";
+    } else {
+      m.teamLevel[winTeam] = bump(m.teamLevel[winTeam], steps);
+      message = `${steps === 3 ? "双上" : steps === 2 ? "头游+三游" : "头游+末游"}，升 ${steps} 级`;
+    }
+    m.level = m.teamLevel[winTeam];
+    m.levelTeam = winTeam;
+    m.prevOrder = order.slice();
+    return { winTeam, steps, passA, before, after: m.teamLevel.slice(), level: m.level, message };
+  }
+
+  // policy/tribute.js
+  var DEFAULT_RETURN = "plan";
+  function chooseReturn(hand, info = {}, variant = DEFAULT_RETURN) {
+    const lv = info.lv || "2";
+    const { cards } = returnOptions(hand, lv);
+    if (!cards.length) return null;
+    const minOf = (arr) => arr.reduce((b, c) => !b || singleStrength(c.rank, lv) < singleStrength(b.rank, lv) ? c : b, null);
+    if (variant === "min" || cards.length === 1) return minOf(cards);
+    const byRank = /* @__PURE__ */ new Map();
+    const nonLevel = cards.filter((c) => c.rank !== lv);
+    const pool = nonLevel.length ? nonLevel : cards;
+    for (const c of pool) if (!byRank.has(c.rank)) byRank.set(c.rank, c);
+    const cache = /* @__PURE__ */ new Map();
+    let best = null;
+    for (const c of byRank.values()) {
+      const rest = hand.filter((x) => x.id !== c.id);
+      const s = decomposeCounts(rest, lv, cache).cost;
+      const str = singleStrength(c.rank, lv);
+      if (!best || s < best.s - 1e-9 || Math.abs(s - best.s) <= 1e-9 && str < best.str) best = { c, s, str };
+    }
+    return best.c;
+  }
+
   // play/core.js
   var SEAT_NAMES = ["南（你）", "东（下家）", "北（对家）", "西（上家）"];
   var PLACE_NAMES = ["头游", "二游", "三游", "末游"];
@@ -2461,12 +2484,16 @@
       return ((_a = suitOrd[a.suit]) != null ? _a : 9) - ((_b = suitOrd[b.suit]) != null ? _b : 9);
     });
   }
-  function newGame({ seed = Date.now() % 1e9, levelRank = "2", progression = true, botEngine = "decide" } = {}) {
+  function newGame({ seed = Date.now() % 1e9, levelRank = "2", progression = true, botEngine = "decide", tribute = null, pre = null } = {}) {
+    const std = newStdMatch(levelRank);
+    if (pre) Object.assign(std, structuredClone(pre), { matchOver: false, winnerTeam: null });
     const g = {
       seed,
       rng: makeRng(seed),
       match: createMatch({ levelRank }),
+      std,
       progression,
+      tribute: tribute == null ? progression : tribute,
       botEngine,
       dealNo: 0,
       round: null,
@@ -2475,21 +2502,87 @@
       trickPlays: [],
       lastResult: null,
       flags: [],
-      nextLeader: Math.floor(makeRng(seed + 7)() * 4)
+      nextLeader: Math.floor(makeRng(seed + 7)() * 4),
+      tributeState: null
     };
     startDeal(g);
     return g;
   }
   function startDeal(g) {
+    var _a;
     g.dealNo += 1;
+    if (g.progression) {
+      if (g.std.matchOver) g.std = newStdMatch("2");
+      g.match.levelRank = g.std.level;
+      g.match.teamLevel = g.std.teamLevel.slice();
+      g.match.matchOver = false;
+      g.match.winnerTeam = null;
+    }
     const hands = dealFourHands(shuffle(makeDeck(), g.rng));
-    g.round = createRound(g.match, { dealerSeat: g.nextLeader, hands });
+    const lv = g.match.levelRank;
+    const plan = g.tribute && g.progression ? planTribute(g.std.prevOrder, hands, lv) : { kind: "none", gives: [], resisted: false, leader: null };
+    const leader = (_a = plan.leader) != null ? _a : g.nextLeader;
+    g.round = createRound(g.match, { dealerSeat: leader, hands });
+    g.tributeState = {
+      plan,
+      phase: plan.kind === "none" || plan.resisted ? "done" : "give",
+      returns: [],
+      pending: [],
+      dealt: hands.map((h) => h.slice())
+    };
     g.log = [];
     g.played = [];
     g.trickPlays = [];
     g.lastResult = null;
     g.leadsSoFar = 0;
     g.lastTablePlay = [null, null, null, null];
+    return g;
+  }
+  function tributePending(g) {
+    return !!g.tributeState && g.tributeState.phase !== "done";
+  }
+  function tributeGive(g) {
+    const ts = g.tributeState;
+    if (!ts || ts.phase !== "give") return { ok: false, reason: "不在进贡阶段" };
+    g.round.hands = applyGives(g.round.hands, ts.plan);
+    ts.pending = ts.plan.gives.map((x) => ({ seat: x.to, to: x.from, received: x.card }));
+    ts.phase = ts.pending.length ? "return" : "done";
+    return { ok: true, gives: ts.plan.gives };
+  }
+  function returnChoices(g, seat) {
+    return returnOptions(g.round.hands[seat], g.match.levelRank).cards;
+  }
+  function tributeReturn(g, seat, card2) {
+    const ts = g.tributeState;
+    if (!ts || ts.phase !== "return") return { ok: false, reason: "不在还贡阶段" };
+    const i = ts.pending.findIndex((p2) => p2.seat === seat);
+    if (i < 0) return { ok: false, reason: "该座位不需要还贡" };
+    const lv = g.match.levelRank;
+    const c = card2 && g.round.hands[seat].find((x) => x.id === card2.id);
+    if (!c || !isLegalReturn(c, g.round.hands[seat], lv)) return { ok: false, reason: "还贡须是 10 或以下的牌（王、逢人配不可）" };
+    const p = ts.pending[i];
+    g.round.hands[seat] = g.round.hands[seat].filter((x) => x.id !== c.id);
+    g.round.hands[p.to] = g.round.hands[p.to].concat(c);
+    ts.returns.push({ from: seat, to: p.to, card: c });
+    ts.pending.splice(i, 1);
+    if (!ts.pending.length) ts.phase = "done";
+    return { ok: true, card: c, to: p.to };
+  }
+  function botReturnCard(g, seat, variant) {
+    const ts = g.tributeState;
+    const p = ts == null ? void 0 : ts.pending.find((x) => x.seat === seat);
+    return chooseReturn(g.round.hands[seat], { lv: g.match.levelRank, seat, to: p == null ? void 0 : p.to, received: p == null ? void 0 : p.received }, variant);
+  }
+  function autoTribute(g, chooser = null, skipSeats = []) {
+    const ts = g.tributeState;
+    if (!ts) return g;
+    if (ts.phase === "give") tributeGive(g);
+    for (const p of ts.pending.slice()) {
+      if (skipSeats.includes(p.seat)) continue;
+      let c = chooser ? chooser(p.seat, g) : botReturnCard(g, p.seat);
+      if (!c || !isLegalReturn(c, g.round.hands[p.seat], g.match.levelRank)) c = minReturn(g.round.hands[p.seat], g.match.levelRank);
+      tributeReturn(g, p.seat, c);
+    }
     return g;
   }
   function isLeading(g) {
@@ -2576,6 +2669,7 @@
     var _a, _b, _c, _d;
     const r = g.round;
     if (isOver(g)) return { ok: false, reason: "本副已结束" };
+    if (tributePending(g)) return { ok: false, reason: "进贡/还贡还没完成" };
     if (seat !== r.currentSeat) return { ok: false, reason: "还没轮到该座位" };
     const it = interpretPlay(g, seat, cards, preferCombo);
     if (!it.ok) return it;
@@ -2652,21 +2746,29 @@
     return seat;
   }
   function finishDeal(g) {
+    var _a, _b;
     const order = g.round.finished.slice();
     const before = g.match.levelRank;
     const teamLevelBefore = g.match.teamLevel.slice();
     let res = { message: "" };
-    if (g.progression) res = applyGameResult(g.match, order);
+    if (g.progression) {
+      res = applyStdResult(g.std, order);
+      g.match.teamLevel = g.std.teamLevel.slice();
+      g.match.matchOver = g.std.matchOver;
+      g.match.winnerTeam = g.std.winnerTeam;
+    }
     g.lastResult = {
       order,
       places: order.map((s, i) => `${PLACE_NAMES[i]}：${SEAT_NAMES[s]}`),
       winTeam: order[0] % 2,
+      steps: (_a = res.steps) != null ? _a : null,
       levelBefore: before,
-      levelAfter: g.match.levelRank,
+      levelAfter: g.progression ? g.std.level : before,
       teamLevelBefore,
       teamLevel: g.match.teamLevel.slice(),
       message: res.message,
-      matchOver: g.match.matchOver
+      matchOver: !!g.match.matchOver,
+      winnerTeam: (_b = g.match.winnerTeam) != null ? _b : null
     };
     g.nextLeader = order[0];
   }
@@ -2736,6 +2838,7 @@
   var jevAvailable = false;
   var botBusy = false;
   var flags = loadFlags();
+  var tribMode = null;
   function loadFlags() {
     try {
       return JSON.parse(localStorage.getItem("gd_flags") || "[]");
@@ -2788,11 +2891,11 @@
     $("lvUs").textContent = m.teamLevel[0];
     $("lvThem").textContent = m.teamLevel[1];
     $("dealNo").textContent = G.dealNo;
-    $("turn").textContent = isOver(G) ? "本副结束" : SEAT_NAMES[r.currentSeat];
+    $("turn").textContent = isOver(G) ? "本副结束" : tribMode ? "进贡" : SEAT_NAMES[r.currentSeat];
     const showAll = $("showAll").checked;
     for (let s = 0; s < 4; s++) {
       const box = $(`seat${s}`);
-      box.classList.toggle("turn", !isOver(G) && r.currentSeat === s);
+      box.classList.toggle("turn", !isOver(G) && !tribMode && r.currentSeat === s);
       const n = r.hands[s].length;
       const placeIdx = r.finished.indexOf(s);
       const tp = G.lastTablePlay[s];
@@ -2820,13 +2923,15 @@
       }
     }
     layoutHand();
-    const myTurn = !isOver(G) && r.currentSeat === HUMAN && !botBusy;
+    const myTurn = !isOver(G) && !tribMode && !tributePending(G) && r.currentSeat === HUMAN && !botBusy;
+    document.body.classList.toggle("tribOn", !!tribMode);
     $("btnPlay").disabled = !myTurn;
     $("btnPass").disabled = !myTurn || isLeading(G);
     $("btnHint").disabled = !myTurn;
     $("btnFlagPos").disabled = !myTurn;
     let st = "";
     if (isOver(G)) st = "本副结束";
+    else if (tribMode) st = tribMode === "resist" ? "抗贡" : tribMode === "return" ? "请你还贡" : "进贡 / 还贡";
     else if (r.currentSeat === HUMAN) st = isLeading(G) ? "轮到你领出" : `轮到你：要压 ${labelCombo(r.lastCombo)}（${SEAT_NAMES[r.lastPlayer]}出）`;
     else st = `${SEAT_NAMES[r.currentSeat]} 思考中…${engineMode() === "jev" ? "（Jev）" : ""}`;
     $("status").textContent = st;
@@ -2855,7 +2960,11 @@
       const inRow = row === rows - 1 ? cards.length - perRow * (rows - 1) : perRow;
       const rowW = (inRow - 1) * step + cw;
       const x0 = Math.max(0, (W - rowW) / 2);
-      const el = cardEl(c, (selected.has(c.id) ? "sel " : "") + (hintIds.has(c.id) ? "hint" : ""));
+      let extra = "";
+      if (tribMode === "return") extra = eligIds.has(c.id) ? " elig" : " dim";
+      if (tribMode === "give" && giveIds.has(c.id)) extra = " tribGive";
+      if (tribMode === "summary" && newIds.has(c.id)) extra = " newCard";
+      const el = cardEl(c, (selected.has(c.id) ? "sel " : "") + (hintIds.has(c.id) ? "hint" : "") + extra);
       el.style.width = cw + "px";
       el.style.height = ch + "px";
       el.style.left = Math.round(x0 + col * step) + "px";
@@ -2886,6 +2995,16 @@
       const el = cardAt(ev.clientX, ev.clientY);
       if (!el) return;
       ev.preventDefault();
+      if (tribMode) {
+        const id = Number(el.dataset.id);
+        if (tribMode === "return" && eligIds.has(id)) {
+          selected = /* @__PURE__ */ new Set([id]);
+          hintIds.clear();
+          renderTribute();
+          render();
+        } else if (tribMode === "return") toast("只能还 10 或以下的牌（王、逢人配不可）");
+        return;
+      }
       mode = selected.has(Number(el.dataset.id)) ? "remove" : "add";
       seen = /* @__PURE__ */ new Set();
       apply(el);
@@ -3013,13 +3132,144 @@
     $("endTitle").textContent = win ? "本副我方获胜 🎉" : "本副对方获胜";
     let html = "<ol>" + R.order.map((s, i) => `<li>${PLACE_NAMES[i]}：${SEAT_NAMES[s]}</li>`).join("") + "</ol>";
     if (G.progression) {
-      html += `<p>${R.message || ""}</p><p>级数：我方 ${R.teamLevelBefore[0]} → ${R.teamLevel[0]}，对方 ${R.teamLevelBefore[1]} → ${R.teamLevel[1]}；下一副打 <b>${R.levelAfter}</b>。</p>`;
-      if (R.matchOver) html += `<p><b>比赛结束：${R.winnerTeam === 0 || G.match.winnerTeam === 0 ? "我方" : "对方"}过 A！</b></p>`;
+      html += `<p>${R.message || ""}（${R.winTeam === 0 ? "我方" : "对方"}）</p><p>级数：我方 ${R.teamLevelBefore[0]} → <b>${R.teamLevel[0]}</b>，对方 ${R.teamLevelBefore[1]} → <b>${R.teamLevel[1]}</b>；下一副打 <b>${R.levelAfter}</b>。</p>`;
+      if (R.matchOver) html += `<p><b>比赛结束：${R.winnerTeam === 0 ? "我方" : "对方"}过 A！</b>下一副新比赛从 2 打起（不进贡）。</p>`;
+      else html += `<p class="tribNext">${nextTributeText(R.order)}</p>`;
+    } else {
+      html += '<p class="muted">（未开“升级”：不进贡，下一副由头游先出。）</p>';
     }
-    html += '<p class="muted">（本版本不做进贡/还贡；下一副由头游先出。）</p>';
     $("endBody").innerHTML = html;
     $("btnNext").textContent = R.matchOver ? "新比赛" : "下一副";
     $("endModal").classList.remove("hidden");
+  }
+  var nm = (s) => s === HUMAN ? "你" : SEAT_NAMES[s].replace(/（.*）/, "");
+  var nmFull = (s) => s === HUMAN ? "你（南）" : SEAT_NAMES[s];
+  function nextTributeText(order) {
+    const [h, s2, t3, t4] = order;
+    if (h % 2 === s2 % 2) return `下一副进贡：双下，${nmFull(t3)} 和 ${nmFull(t4)} 各进贡一张最大的牌（大的给头游 ${nm(h)}、小的给二游 ${nm(s2)}），两家合计两张大王可抗贡。`;
+    return `下一副进贡：末游 ${nmFull(t4)} 向头游 ${nmFull(h)} 进贡一张最大的牌（红桃级牌除外），有两张大王可抗贡。`;
+  }
+  var eligIds = /* @__PURE__ */ new Set();
+  var giveIds = /* @__PURE__ */ new Set();
+  var newIds = /* @__PURE__ */ new Set();
+  function cardChip(c, cls = "") {
+    const el = cardEl(c, `small ${cls}`);
+    return el.outerHTML;
+  }
+  function renderTribute() {
+    const box = $("tribPanel");
+    if (!tribMode) {
+      box.classList.add("hidden");
+      return;
+    }
+    box.classList.remove("hidden");
+    const ts = G.tributeState;
+    const p = ts.plan;
+    const lv = G.match.levelRank;
+    const showAll = $("showAll").checked;
+    let title = "", body = "", btn = "", btn2 = "";
+    if (tribMode === "resist") {
+      title = "抗贡";
+      const who = (p.resistBy || []).map(nmFull).join("、");
+      body = `<div class="tribRow anim">${p.kind === "double" ? `双下方 ${who} 合计有两张大王` : `末游 ${who} 有两张大王`}，<b>抗贡</b>：本副不进贡、不还贡。</div><div class="tribRow">由头游 <b>${nmFull(p.leader)}</b> 先出。</div>`;
+      btn = "开始出牌";
+    } else if (tribMode === "give") {
+      title = p.kind === "double" ? "进贡（双下双贡）" : "进贡";
+      body = p.gives.map((g, i) => `<div class="tribRow anim" style="animation-delay:${i * 0.25}s">${nmFull(g.from)} → ${nmFull(g.to)}：${cardChip(g.card, "fly")}</div>`).join("");
+      if (p.tie) body += '<div class="tribRow small muted">两张贡牌一样大：头游的下家进贡给头游。</div>';
+      const mine = p.gives.find((g) => g.from === HUMAN);
+      body += mine ? `<div class="tribRow">你要进贡手里最大的牌（红桃级牌除外）：已自动选好。</div>` : '<div class="tribRow small muted">贡牌是强制的：手里最大的一张（红桃级牌除外）。</div>';
+      btn = mine ? "确认进贡" : "继续";
+    } else if (tribMode === "return") {
+      const pend = ts.pending.find((x) => x.seat === HUMAN);
+      title = "还贡";
+      body = `<div class="tribRow">你收到 ${nmFull(pend.to)} 的贡牌 ${cardChip(pend.received)}，请选一张 <b>10 或以下</b> 的牌还给 ${nm(pend.to)}（亮着的牌可选）。</div>`;
+      const sel = [...selected].map((id) => G.round.hands[HUMAN].find((c) => c.id === id)).filter(Boolean)[0];
+      body += `<div class="tribRow">已选：${sel ? cardChip(sel) : '<span class="muted">（未选）</span>'}</div>`;
+      btn = "确认还贡";
+      btn2 = "建议";
+    } else if (tribMode === "summary") {
+      title = "进贡完成";
+      body = p.gives.map((g) => `<div class="tribRow">进贡：${nmFull(g.from)} → ${nmFull(g.to)} ${cardChip(g.card)}</div>`).join("");
+      body += ts.returns.map((r, i) => {
+        const seen = r.from === HUMAN || r.to === HUMAN || showAll;
+        return `<div class="tribRow anim" style="animation-delay:${i * 0.25}s">还贡：${nmFull(r.from)} → ${nmFull(r.to)} ${seen ? cardChip(r.card, "fly") : '<span class="muted">（暗还一张 ≤10 的牌）</span>'}</div>`;
+      }).join("");
+      body += `<div class="tribRow">由 <b>${nmFull(G.round.currentSeat)}</b> 先出${p.kind === "double" ? "（进贡给头游的人）" : "（进贡的人）"}。</div>`;
+      btn = "开始出牌";
+    }
+    box.innerHTML = `<div class="tribHead"><b>${title}</b><span class="lvBadge">打 ${lv}</span><button id="tribRules" class="link" type="button" title="进贡规则">规则？</button></div><div class="tribBody">${body}</div><div class="tribBtns">${btn2 ? `<button id="tribHint" type="button">${btn2}</button>` : ""}<button id="tribOk" class="primary" type="button">${btn}</button></div>`;
+    $("tribRules").onclick = () => $("rulesModal").classList.remove("hidden");
+    $("tribOk").onclick = tributeNext;
+    if (tribMode === "return") {
+      $("tribOk").disabled = selected.size !== 1;
+      $("tribHint").onclick = () => {
+        const c = botReturnCard(G, HUMAN);
+        if (c) {
+          selected = /* @__PURE__ */ new Set([c.id]);
+          hintIds = /* @__PURE__ */ new Set([c.id]);
+          toast(`建议还 ${formatCard(c)}：尽量不拆对子/顺子/炸弹`);
+          renderTribute();
+          render();
+        }
+      };
+    }
+  }
+  function beginTribute() {
+    const ts = G.tributeState;
+    tribMode = null;
+    newIds = /* @__PURE__ */ new Set();
+    if (!ts || ts.plan.kind === "none") return false;
+    if (ts.plan.resisted) tribMode = "resist";
+    else {
+      tribMode = "give";
+      const mine = ts.plan.gives.find((g) => g.from === HUMAN);
+      giveIds = new Set(mine ? [mine.card.id] : []);
+      selected = new Set(giveIds);
+    }
+    renderTribute();
+    return true;
+  }
+  function tributeNext() {
+    const ts = G.tributeState;
+    if (tribMode === "give") {
+      tributeGive(G);
+      autoTribute(G, null, [HUMAN]);
+      selected.clear();
+      giveIds = /* @__PURE__ */ new Set();
+      const mineRecv = ts.plan.gives.find((g) => g.to === HUMAN);
+      if (mineRecv) newIds.add(mineRecv.card.id);
+      if (ts.pending.some((x) => x.seat === HUMAN)) {
+        tribMode = "return";
+        eligIds = new Set(returnChoices(G, HUMAN).map((c) => c.id));
+      } else {
+        tribMode = "summary";
+        for (const r of ts.returns) if (r.to === HUMAN) newIds.add(r.card.id);
+      }
+    } else if (tribMode === "return") {
+      const id = [...selected][0];
+      const c = G.round.hands[HUMAN].find((x) => x.id === id);
+      const res = tributeReturn(G, HUMAN, c);
+      if (!res.ok) {
+        toast(res.reason);
+        return;
+      }
+      selected.clear();
+      hintIds.clear();
+      eligIds = /* @__PURE__ */ new Set();
+      tribMode = "summary";
+    } else {
+      const sum = ts.plan.resisted ? `抗贡，${nm(ts.plan.leader)}先出` : ts.plan.gives.map((g) => `${nm(g.from)}→${nm(g.to)} ${formatCard(g.card)}`).join("，") + "；" + ts.returns.map((r) => `${nm(r.from)}→${nm(r.to)} ${r.from === HUMAN || r.to === HUMAN ? formatCard(r.card) : "暗还"}`).join("，");
+      $("feedback").innerHTML = `<div class="muted">本副${ts.plan.resisted ? "" : "进贡"}：${sum}</div>`;
+      tribMode = null;
+      newIds = /* @__PURE__ */ new Set();
+      renderTribute();
+      render();
+      scheduleBots();
+      return;
+    }
+    renderTribute();
+    render();
   }
   function openFlag(entry, btn = null) {
     var _a;
@@ -3127,7 +3377,12 @@
   function startNew() {
     token += 1;
     botBusy = false;
-    G = newGame({ progression: $("progression").checked });
+    const qs = typeof location !== "undefined" ? new URLSearchParams(location.search) : null;
+    const seedQ = qs && !startNew.used && qs.get("seed") ? Number(qs.get("seed")) : null;
+    startNew.used = true;
+    G = newGame(seedQ != null && Number.isFinite(seedQ) ? { progression: $("progression").checked, seed: seedQ } : { progression: $("progression").checked });
+    tribMode = null;
+    renderTribute();
     selected.clear();
     hintIds.clear();
     coachCache = null;
@@ -3145,13 +3400,15 @@
     }
     token += 1;
     G.progression = $("progression").checked;
+    G.tribute = G.progression;
     startDeal(G);
     selected.clear();
     hintIds.clear();
     coachCache = null;
     $("feedback").innerHTML = "";
+    const wait = beginTribute();
     render();
-    scheduleBots();
+    if (!wait) scheduleBots();
   }
   function init() {
     $("btnPlay").onclick = () => {
@@ -3180,6 +3437,11 @@
     $("flagCancel").onclick = () => $("flagModal").classList.add("hidden");
     $("btnNext").onclick = nextDeal;
     $("endClose").onclick = () => $("endModal").classList.add("hidden");
+    $("btnRules").onclick = () => {
+      closeMenu();
+      $("rulesModal").classList.remove("hidden");
+    };
+    $("rulesClose").onclick = () => $("rulesModal").classList.add("hidden");
     $("btnNew").onclick = () => {
       closeMenu();
       if (confirm("开始新比赛？")) startNew();
@@ -3227,7 +3489,10 @@
       }).catch(() => {
       });
     }
-    $("showAll").onchange = render;
+    $("showAll").onchange = () => {
+      render();
+      renderTribute();
+    };
     $("progression").onchange = () => {
       if (G) G.progression = $("progression").checked;
     };
