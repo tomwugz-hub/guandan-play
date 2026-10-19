@@ -174,4 +174,4 @@ body.tribOn #actions { display: none; }
   #tribPanel { position: relative; padding-right: 250px; }
   #tribPanel .tribBtns button { min-height: 36px; min-width: 96px; font-size: 15px; }
 }
-body.tribOn #toast { bottom: auto; top: calc(70px + env(safe-area-inset-top)); }
+body.tribOn #toast { font-size: 13px; padding: 6px 12px; border-radius: 14px; box-sizing: border-box; } /* 位置由 ui.js placeToast 按进贡面板计算 */

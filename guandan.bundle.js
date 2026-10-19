@@ -2925,6 +2925,11 @@
     layoutHand();
     const myTurn = !isOver(G) && !tribMode && !tributePending(G) && r.currentSeat === HUMAN && !botBusy;
     document.body.classList.toggle("tribOn", !!tribMode);
+    const tEl = $("toast");
+    if (!tEl.classList.contains("hidden")) {
+      placeToast(tEl);
+      requestAnimationFrame(() => placeToast(tEl));
+    }
     $("btnPlay").disabled = !myTurn;
     $("btnPass").disabled = !myTurn || isLeading(G);
     $("btnHint").disabled = !myTurn;
@@ -3024,8 +3029,28 @@
     const el = $("toast");
     el.textContent = t;
     el.classList.remove("hidden");
+    placeToast(el);
     clearTimeout(toast._t);
     toast._t = setTimeout(() => el.classList.add("hidden"), ms);
+  }
+  function placeToast(el) {
+    const st = el.style;
+    st.top = st.bottom = st.left = st.right = st.transform = st.maxWidth = st.width = "";
+    if (!document.body.classList.contains("tribOn")) return;
+    const p = $("tribPanel").getBoundingClientRect();
+    if (!p.height) return;
+    st.top = "auto";
+    st.width = "max-content";
+    st.bottom = Math.round(innerHeight - p.top + 6) + "px";
+    const side = $("side").getBoundingClientRect();
+    if (side.width && side.left > innerWidth / 2 && side.bottom <= p.top + 4) {
+      st.left = "auto";
+      st.transform = "none";
+      st.right = Math.max(6, Math.round(innerWidth - side.right)) + "px";
+      st.maxWidth = Math.round(side.width) + "px";
+    } else {
+      st.maxWidth = Math.round(Math.min(innerWidth - 20, p.width)) + "px";
+    }
   }
   function renderLog() {
     const ol = $("log");
