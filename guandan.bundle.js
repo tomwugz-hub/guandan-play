@@ -1593,7 +1593,7 @@
     score += heuristicEval(move, ctx) * 0.15;
     const hand = ctx.hand || [];
     const byRank = rankCounts(hand);
-    const enemyShort = enemyShortCount(ctx);
+    const enemyShort = ctx.leading ? liveEnemyMin(ctx) : enemyShortCount(ctx);
     const hasBomb = handHasBomb(byRank);
     const levelRank = ctx.levelRank || "2";
     const partner = resolvePartnerCombo(ctx);
@@ -2085,7 +2085,45 @@
         }
       }
     }
+    if (isBombLike(move.combo) && !emptiesHand(move, hand)) {
+      const alts = (allMoves || []).filter((m) => m !== move && isBombLike(m.combo) && !emptiesHand(m, hand));
+      if (alts.length) {
+        let best = null, bc = Infinity;
+        for (const m of alts) {
+          const c = bombCost(m, levelRank);
+          if (c < bc) {
+            bc = c;
+            best = m;
+          }
+        }
+        const d = bombCost(move, levelRank) - bc;
+        if (d > 0) {
+          const FIN = { sure: 3, bombBack: 2, likely: 1 };
+          const fm = FIN[moveFinish(move, ctx, laCache(ctx))] || 0;
+          const fb = FIN[moveFinish(best, ctx, laCache(ctx))] || 0;
+          if (fm <= fb) {
+            score -= Math.min(60, d);
+            tags.push(wildFillers(move, levelRank) > wildFillers(best, levelRank) ? "bombWildPad" : "bombOversize");
+          }
+        }
+      }
+    }
     return { score, tags };
+  }
+  function bombCost(m, levelRank) {
+    const c = m.combo;
+    const tier = c.type === TYPES.BOMB && (c.rocket || c.rank === "RJ") ? 12 : c.type === TYPES.STRAIGHT_FLUSH ? 1.5 : (c.bombSize || c.size || m.cards.length) - 4;
+    return 20 * wildFillers(m, levelRank) + 6 * tier + 0.5 * Math.min(singleStrength(c.rank, levelRank) || 0, 16);
+  }
+  function liveEnemyMin(ctx) {
+    var _a;
+    const counts = ctx.remainingSeatCounts || ctx.opponentCounts || [27, 27, 27, 27];
+    const seat = (_a = ctx.seat) != null ? _a : 0;
+    const live = [(seat + 1) % 4, (seat + 3) % 4].map((s) => {
+      var _a2;
+      return (_a2 = counts[s]) != null ? _a2 : 27;
+    }).filter((x) => x > 0);
+    return live.length ? Math.min(...live) : 27;
   }
   function earlyFollowCost(m, prev, hand, levelRank) {
     if (!m || isPass(m) || !prev || !m.combo || m.combo.type !== prev.type || isBombLike(m.combo)) return null;
