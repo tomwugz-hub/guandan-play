@@ -3012,11 +3012,27 @@
     return window.innerWidth < 900 || window.innerHeight <= 500;
   }
   function placeCoach() {
-    const panel = $("coachPanel");
-    const portraitPhone = window.innerWidth < 900 && !(window.innerHeight <= 500 && window.innerWidth > window.innerHeight);
-    const target = portraitPhone ? $("handArea") : $("side");
-    if (panel.parentElement !== target) target.insertBefore(panel, target.firstChild);
-    panel.classList.toggle("strip", portraitPhone);
+    if (placeCoach.done) return;
+    placeCoach.done = true;
+    if (window.innerWidth >= 1280 && window.innerHeight >= 640) setDrawer(true);
+  }
+  function setDrawer(open) {
+    document.body.classList.toggle("drawerOpen", open);
+    if (open) $("coachTip").classList.add("hidden");
+  }
+  function coachTip(html) {
+    const el = $("coachTip");
+    if (!html || document.body.classList.contains("drawerOpen")) {
+      el.classList.add("hidden");
+      return;
+    }
+    el.innerHTML = html;
+    el.classList.remove("hidden");
+  }
+  var AV_COLORS = [["#ffb347", "#e0731b"], ["#6fc3ff", "#2a7fd0"], ["#9be37a", "#3f9c34"], ["#ff8fb1", "#c9406b"]];
+  function avatarSvg(s) {
+    const [a, b] = AV_COLORS[s];
+    return `<svg viewBox="0 0 64 64" aria-hidden="true"><defs><radialGradient id="avg${s}" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></radialGradient></defs><circle cx="32" cy="32" r="32" fill="url(#avg${s})"/><circle cx="32" cy="25" r="11" fill="#fff" fill-opacity=".92"/><path d="M12 56c2-12 11-18 20-18s18 6 20 18" fill="#fff" fill-opacity=".92"/></svg>`;
   }
   var SUIT_SYM = { S: "♠", H: "♥", D: "♦", C: "♣" };
   function cardEl(c, cls = "") {
@@ -3026,12 +3042,17 @@
     if (c.rank === "RJ" || c.rank === "BJ") {
       el.classList.add("joker");
       if (c.rank === "RJ") el.classList.add("red");
-      el.innerHTML = c.rank === "RJ" ? "大<br>王" : "小<br>王";
+      el.innerHTML = `<span class="cr">J<br>O<br>K<br>E<br>R</span><span class="jk">${c.rank === "RJ" ? "大王" : "小王"}</span>`;
     } else {
       if (c.suit === "H" || c.suit === "D") el.classList.add("red");
-      el.innerHTML = `${c.rank}<br><span class="s">${SUIT_SYM[c.suit] || ""}</span>`;
+      const sym = SUIT_SYM[c.suit] || "";
+      const rk = c.rank === "T" ? "10" : c.rank;
+      el.innerHTML = `<span class="cr">${rk}<br><span class="s">${sym}</span></span><span class="pip">${sym}</span>`;
       if (c.rank === lv) el.classList.add("level");
-      if (isWildCard(c, lv)) el.classList.add("wild");
+      if (isWildCard(c, lv)) {
+        el.classList.add("wild");
+        el.insertAdjacentHTML("beforeend", '<span class="wildTag">配</span>');
+      }
     }
     return el;
   }
@@ -3049,26 +3070,35 @@
     const showAll = $("showAll").checked;
     for (let s = 0; s < 4; s++) {
       const box = $(`seat${s}`);
-      box.classList.toggle("turn", !isOver(G) && !tribMode && r.currentSeat === s);
+      const isTurn = !isOver(G) && !tribMode && r.currentSeat === s;
+      box.classList.toggle("turn", isTurn);
       const n = r.hands[s].length;
       const placeIdx = r.finished.indexOf(s);
       const tp = G.lastTablePlay[s];
+      const team = s % 2;
       box.innerHTML = "";
+      box.classList.toggle("teamUs", team === 0);
+      box.classList.toggle("teamThem", team === 1);
       const head = document.createElement("div");
       head.className = "head";
-      head.innerHTML = `<span class="name">${compact() ? SEAT_COMPACT[s] : SEAT_NAMES[s]}</span><span class="cnt ${n === 0 ? "out" : n <= 5 ? "warn" : ""}">${n === 0 ? "出完" : n + " 张"}</span>` + (placeIdx >= 0 && (n === 0 || isOver(G)) ? `<span class="place">${PLACE_NAMES[placeIdx]}</span>` : "") + (s !== HUMAN && !compact() ? `<span class="tag">${s === 2 ? "队友" : "对手"}</span>` : "");
+      const place = placeIdx >= 0 && (n === 0 || isOver(G)) ? `<span class="place">${PLACE_NAMES[placeIdx]}</span>` : "";
+      head.innerHTML = `<div class="avatar">${avatarSvg(s)}<span class="ring"></span>${place}</div><div class="meta"><span class="name">${compact() ? SEAT_COMPACT[s] : SEAT_NAMES[s]}</span><span class="tag">${s === HUMAN ? "我" : s === 2 ? "队友" : "对手"} · 打${m.teamLevel[team]}</span></div><span class="cnt ${n === 0 ? "out" : n <= 5 ? "warn" : ""}">${n === 0 ? "出完" : n + " 张"}</span>`;
       box.appendChild(head);
-      const pl = document.createElement("div");
-      pl.className = "played";
-      if (tp == null ? void 0 : tp.pass) pl.innerHTML = '<span class="passed">过</span>';
+      const pl = $(`pz${s}`);
+      pl.className = "pz played";
+      pl.innerHTML = "";
+      if (tp == null ? void 0 : tp.pass) pl.innerHTML = '<span class="passed">不出</span>';
       else if (tp == null ? void 0 : tp.cards) {
-        for (const c of tp.cards) pl.appendChild(cardEl(c, "small"));
+        const row = document.createElement("div");
+        row.className = "fan";
+        for (const c of tp.cards) row.appendChild(cardEl(c, "small"));
+        pl.appendChild(row);
         const t = document.createElement("span");
         t.className = "tag";
         t.textContent = labelCombo(tp.combo);
         pl.appendChild(t);
+        pl.classList.toggle("last", r.lastPlayer === s && !isLeading(G));
       }
-      box.appendChild(pl);
       if (showAll && s !== HUMAN && n) {
         const op = document.createElement("div");
         op.className = "open";
@@ -3099,39 +3129,45 @@
   function layoutHand() {
     const hand = $("hand");
     const cards = sortHand(G.round.hands[HUMAN], G.match.levelRank);
+    const lv = G.match.levelRank;
     hand.innerHTML = "";
     const W = hand.clientWidth || window.innerWidth - 24;
     const shortLand = window.innerHeight <= 500 && window.innerWidth > window.innerHeight;
     const phone = window.innerWidth < 900;
-    const cw = shortLand ? 40 : phone ? 48 : 56;
-    const ch = shortLand ? 56 : phone ? 68 : 80;
-    const minStep = shortLand ? 22 : phone ? 23 : 26;
-    const maxStep = cw + 4;
-    const perRowMax = Math.max(1, Math.floor((W - cw) / minStep) + 1);
-    const rows = cards.length > perRowMax ? 2 : 1;
-    const perRow = Math.ceil(cards.length / rows) || 1;
-    const step = perRow > 1 ? Math.min(maxStep, (W - cw) / (perRow - 1)) : 0;
-    const rowGap = Math.round(ch * 0.56);
-    const raise = 16;
-    cards.forEach((c, i) => {
-      const row = Math.floor(i / perRow);
-      const col = i % perRow;
-      const inRow = row === rows - 1 ? cards.length - perRow * (rows - 1) : perRow;
-      const rowW = (inRow - 1) * step + cw;
-      const x0 = Math.max(0, (W - rowW) / 2);
-      let extra = "";
-      if (tribMode === "return") extra = eligIds.has(c.id) ? " elig" : " dim";
-      if (tribMode === "give" && giveIds.has(c.id)) extra = " tribGive";
-      if (tribMode === "summary" && newIds.has(c.id)) extra = " newCard";
-      const el = cardEl(c, (selected.has(c.id) ? "sel " : "") + (hintIds.has(c.id) ? "hint" : "") + extra);
-      el.style.width = cw + "px";
-      el.style.height = ch + "px";
-      el.style.left = Math.round(x0 + col * step) + "px";
-      el.style.top = raise + row * rowGap + "px";
-      el.dataset.id = c.id;
-      hand.appendChild(el);
+    const cw = shortLand ? 44 : phone ? 46 : 64;
+    const ch = Math.round(cw * 1.4);
+    const cols = [];
+    for (const c of cards) {
+      const key = c.rank + (isWildCard(c, lv) ? "*" : "");
+      if (cols.length && cols[cols.length - 1].key === key) cols[cols.length - 1].cards.push(c);
+      else cols.push({ key, cards: [c] });
+    }
+    const maxStack = Math.max(1, ...cols.map((c) => c.cards.length));
+    const maxH = shortLand ? Math.max(ch + 36, window.innerHeight * 0.3) : phone ? Math.max(ch + 60, window.innerHeight * 0.3) : 230;
+    const vStep = maxStack > 1 ? Math.max(14, Math.min(Math.round(ch * 0.3), (maxH - ch) / (maxStack - 1))) : 0;
+    const nc = cols.length;
+    const step = nc > 1 ? Math.min(cw + 4, (W - cw) / (nc - 1)) : 0;
+    const totalW = (nc - 1) * step + cw;
+    const x0 = Math.max(0, (W - totalW) / 2);
+    const raise = 14;
+    const baseTop = raise + (maxStack - 1) * vStep;
+    cols.forEach((col, ci) => {
+      col.cards.forEach((c, k) => {
+        let extra = "";
+        if (tribMode === "return") extra = eligIds.has(c.id) ? " elig" : " dim";
+        if (tribMode === "give" && giveIds.has(c.id)) extra = " tribGive";
+        if (tribMode === "summary" && newIds.has(c.id)) extra = " newCard";
+        const el = cardEl(c, (selected.has(c.id) ? "sel " : "") + (hintIds.has(c.id) ? "hint" : "") + extra);
+        el.style.width = cw + "px";
+        el.style.height = ch + "px";
+        el.style.left = Math.round(x0 + ci * step) + "px";
+        el.style.top = Math.round(baseTop - (col.cards.length - 1 - k) * vStep) + "px";
+        el.style.zIndex = String(10 + ci * 10 + k);
+        el.dataset.id = c.id;
+        hand.appendChild(el);
+      });
     });
-    hand.style.height = (cards.length ? raise + (rows - 1) * rowGap + ch + 2 : 20) + "px";
+    hand.style.height = (cards.length ? baseTop + ch + 4 : 20) + "px";
   }
   function setupHandPointer() {
     const hand = $("hand");
@@ -3187,24 +3223,7 @@
     clearTimeout(toast._t);
     toast._t = setTimeout(() => el.classList.add("hidden"), ms);
   }
-  function placeToast(el) {
-    const st = el.style;
-    st.top = st.bottom = st.left = st.right = st.transform = st.maxWidth = st.width = "";
-    if (!document.body.classList.contains("tribOn")) return;
-    const p = $("tribPanel").getBoundingClientRect();
-    if (!p.height) return;
-    st.top = "auto";
-    st.width = "max-content";
-    st.bottom = Math.round(innerHeight - p.top + 6) + "px";
-    const side = $("side").getBoundingClientRect();
-    if (side.width && side.left > innerWidth / 2 && side.bottom <= p.top + 4) {
-      st.left = "auto";
-      st.transform = "none";
-      st.right = Math.max(6, Math.round(innerWidth - side.right)) + "px";
-      st.maxWidth = Math.round(side.width) + "px";
-    } else {
-      st.maxWidth = Math.round(Math.min(innerWidth - 20, p.width)) + "px";
-    }
+  function placeToast() {
   }
   function renderLog() {
     const ol = $("log");
@@ -3258,6 +3277,7 @@
     hintIds.clear();
     $("hintBox").textContent = "";
     const e = res.entry;
+    coachTip(e.coach.same ? "" : `你出：${e.move.text} · 教练会出：<b>${e.coach.text}</b>`);
     $("feedback").innerHTML = e.coach.same ? `<div class="good">✔ 与教练一致：${e.move.text}</div>` : `<div class="bad">你出：${e.move.text}<br>教练会出：<b>${e.coach.text}</b><br><span class="muted">${e.coach.reason || ""}</span></div>`;
     afterMove(res);
   }
@@ -3620,6 +3640,7 @@
     selected.clear();
     hintIds.clear();
     coachCache = null;
+    coachTip("");
     $("feedback").innerHTML = "";
     $("hintBox").textContent = "轮到你时点“提示”查看 decide 的建议。";
     render();
@@ -3639,6 +3660,7 @@
     selected.clear();
     hintIds.clear();
     coachCache = null;
+    coachTip("");
     $("feedback").innerHTML = "";
     const wait = beginTribute();
     render();
@@ -3659,11 +3681,21 @@
       hintIds.clear();
       render();
     };
+    $("btnDrawer").onclick = () => {
+      closeMenu();
+      setDrawer(!document.body.classList.contains("drawerOpen"));
+    };
+    $("drawerClose").onclick = () => setDrawer(false);
+    $("coachTip").onclick = () => setDrawer(true);
+    document.addEventListener("pointerdown", (e) => {
+      if ($("menu").classList.contains("open") && !e.target.closest("#menu, #btnMenu")) closeMenu();
+    });
     $("btnHint").onclick = () => {
       const c = humanCoach();
       hintIds = new Set((c.move.cards || []).map((x) => x.id));
       selected = new Set(hintIds);
       $("hintBox").innerHTML = `建议：<b>${c.text}</b><br><span class="muted">${c.reason || ""}</span>`;
+      coachTip(`💡 建议：<b>${c.text}</b>${c.reason ? `<span class="muted"> · ${c.reason}</span>` : ""}`);
       render();
     };
     $("btnFlagPos").onclick = flagCurrentPosition;
@@ -3699,13 +3731,10 @@
     window.addEventListener("resize", () => {
       clearTimeout(rt);
       rt = setTimeout(() => {
-        placeCoach();
         if (G) render();
       }, 80);
     });
     placeCoach();
-    $("coachPanel").onclick = () => $("coachPanel").classList.toggle("expanded");
-    if (window.innerWidth >= 900 && window.innerHeight > 500) $("logPanel").open = true;
     $("logPanel").addEventListener("toggle", () => {
       if ($("logPanel").open) $("logPanel").scrollTop = $("logPanel").scrollHeight;
     });

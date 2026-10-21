@@ -16,63 +16,72 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="felt"></div>
 <header id="topbar">
-  <div class="title">掼蛋教练</div>
+  <button id="btnMenu" class="icoBtn" aria-label="菜单" title="菜单">☰</button>
   <div class="info">
-    <span>打<b id="level">2</b></span>
-    <span class="lv">我<b id="lvUs">2</b>·对<b id="lvThem">2</b></span>
+    <span class="lvChip us"><i>我方</i>打<b id="lvUs">2</b></span>
+    <span class="lvChip them"><i>对方</i>打<b id="lvThem">2</b></span>
+    <span class="curLv">本副打<b id="level">2</b></span>
     <span class="deal">第<b id="dealNo">1</b>副</span>
     <span class="turnInfo">轮到 <b id="turn">-</b></span>
   </div>
-  <button id="btnMenu" aria-label="菜单">☰</button>
+  <button id="btnDrawer" class="icoBtn" aria-label="教练与出牌记录" title="教练提示 / 出牌记录">📋</button>
   <div id="menu">
-    <label>机器人：<select id="engine">
+    <div class="menuTitle">设置</div>
+    <label>机器人<select id="engine">
       <option value="decide">decide（离线）</option>
       <option value="jev" disabled>Jev（需电脑本地服务）</option>
     </select></label>
-    <label>速度：<select id="speed">
+    <label>速度<select id="speed">
       <option value="1200">慢</option>
       <option value="700" selected>中</option>
       <option value="250">快</option>
     </select></label>
-    <label><input type="checkbox" id="progression" checked> 升级</label>
-    <label><input type="checkbox" id="showAll"> 明牌</label>
-    <button id="btnRules">进贡规则</button>
-    <button id="btnNew">新比赛</button>
-    <button id="btnShare">分享/导出对局记录</button>
-    <button id="btnDownload">下载对局记录（标记 <span id="flagCount">0</span>）</button>
+    <label class="chk"><input type="checkbox" id="progression" checked> 升级</label>
+    <label class="chk"><input type="checkbox" id="showAll"> 明牌</label>
+    <button id="btnRules">📖 进贡规则</button>
+    <button id="btnNew">🔄 新比赛</button>
+    <button id="btnShare">📤 分享/导出对局记录</button>
+    <button id="btnDownload">💾 下载对局记录（标记 <span id="flagCount">0</span>）</button>
   </div>
 </header>
 <main id="main">
   <section id="table">
     <div class="seat" id="seat2"></div>
     <div class="seat" id="seat3"></div>
-    <div id="center"><div id="status"></div></div>
     <div class="seat" id="seat1"></div>
     <div class="seat" id="seat0"></div>
+    <div class="pz" id="pz2"></div>
+    <div class="pz" id="pz3"></div>
+    <div class="pz" id="pz1"></div>
+    <div class="pz" id="pz0"></div>
+    <div id="center"><div id="status"></div></div>
+    <div id="tribPanel" class="hidden" aria-live="polite"></div>
   </section>
   <aside id="side">
+    <div class="drawerHead"><b>教练 · 出牌记录</b><button id="drawerClose" class="icoBtn" aria-label="关闭">✕</button></div>
     <div class="panel" id="coachPanel">
       <div id="hintBox" class="muted">轮到你时点“提示”查看教练建议。</div>
       <div id="feedback"></div>
     </div>
-    <details class="panel" id="logPanel">
+    <details class="panel" id="logPanel" open>
       <summary>出牌记录 <small class="muted">（🚩 标记任一手）</small></summary>
       <ol id="log"></ol>
     </details>
   </aside>
 </main>
 <footer id="handArea">
-  <div id="tribPanel" class="hidden" aria-live="polite"></div>
-  <div id="hand"></div>
+  <div id="coachTip" class="hidden"></div>
   <div id="actions">
-    <button id="btnPlay" class="primary">出牌</button>
-    <button id="btnPass">过</button>
-    <button id="btnHint">提示</button>
-    <button id="btnFlagPos">🚩标记</button>
-    <button id="btnClear">清空</button>
+    <button id="btnFlagPos" class="mini">🚩标记</button>
+    <button id="btnPass" class="act pass">不出</button>
+    <button id="btnHint" class="act hint">提示</button>
+    <button id="btnPlay" class="act primary">出牌</button>
+    <button id="btnClear" class="mini">重置</button>
   </div>
   <div id="msg"></div>
+  <div id="hand"></div>
 </footer>
 
 <div class="modal hidden" id="flagModal">
