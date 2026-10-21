@@ -2573,14 +2573,97 @@
       trickPlays: [],
       lastResult: null,
       flags: [],
+      history: [],
+      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
       nextLeader: Math.floor(makeRng(seed + 7)() * 4),
       tributeState: null
     };
     startDeal(g);
     return g;
   }
+  function archiveDeal(g) {
+    if (!g.round || !g.dealNo) return;
+    g.history = g.history || [];
+    if (g.history.some((d) => d.deal === g.dealNo)) return;
+    g.history.push(dealRecord(g));
+  }
+  function dealRecord(g) {
+    var _a;
+    const ts = g.tributeState || {};
+    const lv = g.match.levelRank;
+    return {
+      deal: g.dealNo,
+      levelRank: lv,
+      teamLevel: g.match.teamLevel ? g.match.teamLevel.slice() : null,
+      dealt: (ts.dealt || []).map((h) => sortHand(h, lv).map(formatCard)),
+      tribute: ts.plan ? {
+        kind: ts.plan.kind,
+        resisted: !!ts.plan.resisted,
+        resistBy: ts.plan.resistBy || null,
+        leader: (_a = ts.plan.leader) != null ? _a : null,
+        gives: (ts.plan.gives || []).map((x) => ({ from: x.from, to: x.to, card: formatCard(x.card) })),
+        returns: (ts.returns || []).map((x) => ({ from: x.from, to: x.to, card: formatCard(x.card) }))
+      } : null,
+      log: g.log.slice(),
+      result: g.lastResult ? structuredClone(g.lastResult) : null,
+      finished: g.round.finished.length >= 4
+    };
+  }
+  function gameLogRows(g, { flags: flags2 = [], app = {} } = {}) {
+    const deals = [...g.history || []];
+    if (g.round && g.dealNo && !deals.some((d) => d.deal === g.dealNo)) deals.push(dealRecord(g));
+    const rows = [];
+    const moves = deals.reduce((n, d) => n + d.log.length, 0);
+    rows.push({
+      type: "game",
+      app: "guandan-play",
+      ...app,
+      seed: g.seed,
+      startedAt: g.startedAt || null,
+      exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      progression: !!g.progression,
+      tribute: !!g.tribute,
+      seats: SEAT_NAMES,
+      humanSeat: 0,
+      deals: deals.length,
+      moves,
+      flags: flags2.length
+    });
+    for (const d of deals) {
+      const { log, ...rest } = d;
+      rows.push({ type: "deal", ...rest, moves: log.length });
+      for (const e of log) {
+        const s = e.snapshot || {};
+        const counts = s.hands ? [0, 1, 2, 3].map((k) => (s.hands[String(k)] || []).length) : null;
+        rows.push({
+          type: "move",
+          deal: e.deal,
+          n: e.n,
+          seat: e.seat,
+          seatName: SEAT_NAMES[e.seat],
+          by: e.by,
+          handBefore: s.hands ? s.hands[String(e.seat)] : null,
+          table: { levelRank: s.levelRank, leading: s.leading, previous: s.previous, trickMeta: s.trickMeta, firstLeadOfDeal: s.firstLeadOfDeal, counts, playedCards: s.playedCards },
+          handsAll: s.hands || null,
+          coach: e.coach,
+          move: e.move,
+          same: e.coach ? !!e.coach.same : null,
+          reason: e.reason || "",
+          trickEnd: !!e.trickEnd,
+          wentOut: e.wentOut || null,
+          flagged: !!e.flagged
+        });
+      }
+    }
+    for (const f of flags2) rows.push({ type: "flag", ...f });
+    return rows;
+  }
+  function gameLogJsonl(g, opts) {
+    return gameLogRows(g, opts).map((r) => JSON.stringify(r)).join("\n") + "\n";
+  }
   function startDeal(g) {
     var _a;
+    archiveDeal(g);
     g.dealNo += 1;
     if (g.progression) {
       if (g.std.matchOver) g.std = newStdMatch("2");
@@ -3181,6 +3264,8 @@
   function afterMove(res) {
     render();
     if (res.finished) {
+      archiveDeal(G);
+      persistGame();
       showEnd();
       return;
     }
@@ -3400,68 +3485,120 @@
     e.flagged = true;
     if (flagBtn) flagBtn.classList.add("on");
     saveFlags();
+    persistGame();
     $("flagModal").classList.add("hidden");
     toast(`已保存标记（共 ${flags.length} 条）`);
   }
-  function flagsText() {
-    return flags.map((f) => JSON.stringify(f)).join("\n") + "\n";
-  }
-  function flagsFileName() {
+  var pad2 = (n) => String(n).padStart(2, "0");
+  function exportFileName(ext = "jsonl") {
     const d = /* @__PURE__ */ new Date();
-    return `guandan-flags-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}.jsonl`;
+    return `guandan-game-${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}.${ext}`;
   }
-  async function shareFlags() {
-    if (!flags.length) {
-      toast("还没有标记");
-      return;
-    }
-    const text = flagsText();
+  var BUILD = typeof document !== "undefined" && document.documentElement.dataset.build || null;
+  function gameText() {
+    var _a;
+    const moves = ((G == null ? void 0 : G.history) || []).reduce((n, d) => n + d.log.length, 0) + (((_a = G == null ? void 0 : G.log) == null ? void 0 : _a.length) || 0);
+    if (G && moves > 0) return { text: gameLogJsonl(G, { flags, app: { build: BUILD, ua: navigator.userAgent } }), moves };
     try {
-      if (navigator.share) {
-        let file = null;
-        try {
-          file = new File([text], flagsFileName(), { type: "text/plain" });
-        } catch {
-          file = null;
-        }
-        if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: "掼蛋标记" });
-          toast("已分享");
-          return;
-        }
-        await navigator.share({ title: "掼蛋标记", text });
-        toast("已分享");
-        return;
-      }
-    } catch (e) {
-      if (e && e.name === "AbortError") return;
-    }
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
-        toast(`已复制 ${flags.length} 条标记到剪贴板`);
-        return;
+      const last = localStorage.getItem("gd_lastgame");
+      if (last) {
+        const lines = last.trim().split("\n");
+        const seen = new Set(lines.map((l) => {
+          try {
+            const o = JSON.parse(l);
+            return o.type === "flag" ? o.id : null;
+          } catch {
+            return null;
+          }
+        }).filter(Boolean));
+        const extra = flags.filter((f) => !seen.has(f.id)).map((f) => JSON.stringify({ type: "flag", ...f }));
+        return { text: [...lines, ...extra].join("\n") + "\n", moves: lines.filter((l) => l.startsWith('{"type":"move"')).length };
       }
     } catch {
     }
+    if (flags.length) return { text: flags.map((f) => JSON.stringify({ type: "flag", ...f })).join("\n") + "\n", moves: 0 };
+    return { text: "", moves: 0 };
+  }
+  function persistGame() {
+    var _a;
+    if (!G) return;
+    const moves = (G.history || []).reduce((n, d) => n + d.log.length, 0) + (((_a = G.log) == null ? void 0 : _a.length) || 0);
+    if (!moves) return;
+    try {
+      localStorage.setItem("gd_lastgame", gameLogJsonl(G, { flags, app: { build: BUILD } }));
+    } catch {
+    }
+  }
+  function triggerDownload(text, name) {
+    const blob = new Blob([text], { type: "application/x-ndjson" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 6e4);
+  }
+  function showCopy(text) {
     $("copyText").value = text;
     $("copyModal").classList.remove("hidden");
     $("copyText").focus();
     $("copyText").select();
   }
-  function download() {
-    if (!flags.length) {
-      toast("还没有标记");
+  async function shareGame() {
+    const { text, moves } = gameText();
+    if (!text) {
+      toast("还没有对局记录");
       return;
     }
-    const blob = new Blob([flagsText()], { type: "application/x-ndjson" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = flagsFileName();
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    if (confirm(`已下载 ${flags.length} 条标记。要清空浏览器里保存的标记吗？`)) {
+    const summary = `${moves} 手${flags.length ? `、${flags.length} 条标记` : ""}`;
+    if (navigator.share && navigator.canShare && typeof File !== "undefined") {
+      let file = null;
+      for (const [ext, type] of [["jsonl", "text/plain"], ["jsonl", "application/json"], ["txt", "text/plain"]]) {
+        try {
+          const f = new File([text], exportFileName(ext), { type });
+          if (navigator.canShare({ files: [f] })) {
+            file = f;
+            break;
+          }
+        } catch {
+        }
+      }
+      if (file) {
+        try {
+          await navigator.share({ files: [file] });
+          toast(`已分享对局记录（${summary}）`);
+          return;
+        } catch (e) {
+          if (e && e.name === "AbortError") return;
+        }
+      }
+    }
+    try {
+      triggerDownload(text, exportFileName("jsonl"));
+    } catch {
+    }
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        toast(`已下载并复制对局记录（${summary}）`, 2600);
+        return;
+      }
+    } catch {
+    }
+    showCopy(text);
+  }
+  function download() {
+    const { text, moves } = gameText();
+    if (!text) {
+      toast("还没有对局记录");
+      return;
+    }
+    triggerDownload(text, exportFileName("jsonl"));
+    toast(`已下载对局记录（${moves} 手${flags.length ? `、${flags.length} 条标记` : ""}）`, 2600);
+    if (flags.length && confirm(`已下载（含 ${flags.length} 条标记）。要清空浏览器里保存的标记吗？（对局记录不受影响）`)) {
       flags = [];
       saveFlags();
     }
@@ -3471,6 +3608,7 @@
     $("topbar").classList.remove("menuOpen");
   }
   function startNew() {
+    persistGame();
     token += 1;
     botBusy = false;
     const qs = typeof location !== "undefined" ? new URLSearchParams(location.search) : null;
@@ -3548,8 +3686,9 @@
     };
     $("btnShare").onclick = () => {
       closeMenu();
-      shareFlags();
+      shareGame();
     };
+    $("btnShareEnd") && ($("btnShareEnd").onclick = () => shareGame());
     $("copyClose").onclick = () => $("copyModal").classList.add("hidden");
     $("btnMenu").onclick = () => {
       $("menu").classList.toggle("open");
@@ -3600,6 +3739,11 @@
       render();
     };
     saveFlags();
+    const persistSoon = () => persistGame();
+    window.addEventListener("pagehide", persistSoon);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") persistGame();
+    });
     if (location.protocol.startsWith("http") && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
       fetch("api/status", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).then((s) => {
         if (!s || !s.server) return;

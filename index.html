@@ -39,8 +39,8 @@
     <label><input type="checkbox" id="showAll"> 明牌</label>
     <button id="btnRules">进贡规则</button>
     <button id="btnNew">新比赛</button>
-    <button id="btnShare">分享/复制标记</button>
-    <button id="btnDownload">下载标记（<span id="flagCount">0</span>）</button>
+    <button id="btnShare">分享/导出对局记录</button>
+    <button id="btnDownload">下载对局记录（标记 <span id="flagCount">0</span>）</button>
   </div>
 </header>
 <main id="main">
@@ -92,12 +92,12 @@
   <div class="box">
     <h3 id="endTitle">本副结束</h3>
     <div id="endBody"></div>
-    <div class="row"><button id="endClose">查看牌局</button><button id="btnNext" class="primary">下一副</button></div>
+    <div class="row"><button id="btnShareEnd">导出记录</button><button id="endClose">查看牌局</button><button id="btnNext" class="primary">下一副</button></div>
   </div>
 </div>
 <div class="modal hidden" id="copyModal">
   <div class="box">
-    <h3>复制标记</h3>
+    <h3>复制对局记录</h3>
     <p class="small">长按下面的文字全选并复制，然后粘贴到备忘录、微信或邮件里。</p>
     <textarea id="copyText" rows="8" readonly></textarea>
     <div class="row"><button id="copyClose" class="primary">关闭</button></div>
