@@ -2390,7 +2390,7 @@
     return best;
   }
   function isReturnEligible(c, lv) {
-    return !!c && !isJokerRank(c.rank) && !isWildCard(c, lv) && NAT_LE10.includes(c.rank);
+    return !!c && !isJokerRank(c.rank) && !isWildCard(c, lv) && c.rank !== lv && NAT_LE10.includes(c.rank);
   }
   function returnOptions(hand, lv) {
     const el = (hand || []).filter((c) => isReturnEligible(c, lv));
@@ -2713,7 +2713,7 @@
     if (i < 0) return { ok: false, reason: "该座位不需要还贡" };
     const lv = g.match.levelRank;
     const c = card2 && g.round.hands[seat].find((x) => x.id === card2.id);
-    if (!c || !isLegalReturn(c, g.round.hands[seat], lv)) return { ok: false, reason: "还贡须是 10 或以下的牌（王、逢人配不可）" };
+    if (!c || !isLegalReturn(c, g.round.hands[seat], lv)) return { ok: false, reason: "还贡须是 10 或以下的牌（王、级牌不可）" };
     const p = ts.pending[i];
     g.round.hands[seat] = g.round.hands[seat].filter((x) => x.id !== c.id);
     g.round.hands[p.to] = g.round.hands[p.to].concat(c);
@@ -3197,7 +3197,7 @@
           hintIds.clear();
           renderTribute();
           render();
-        } else if (tribMode === "return") toast("只能还 10 或以下的牌（王、逢人配不可）");
+        } else if (tribMode === "return") toast("只能还 10 或以下的牌（王、级牌不可）");
         return;
       }
       mode = selected.has(Number(el.dataset.id)) ? "remove" : "add";
@@ -3384,7 +3384,7 @@
     } else if (tribMode === "return") {
       const pend = ts.pending.find((x) => x.seat === HUMAN);
       title = "还贡";
-      body = `<div class="tribRow">你收到 ${nmFull(pend.to)} 的贡牌 ${cardChip(pend.received)}，请选一张 <b>10 或以下</b> 的牌还给 ${nm(pend.to)}（亮着的牌可选）。</div>`;
+      body = `<div class="tribRow">你收到 ${nmFull(pend.to)} 的贡牌 ${cardChip(pend.received)}，请选一张 <b>10 或以下</b>（级牌除外）的牌还给 ${nm(pend.to)}（亮着的牌可选）。</div>`;
       const sel = [...selected].map((id) => G.round.hands[HUMAN].find((c) => c.id === id)).filter(Boolean)[0];
       body += `<div class="tribRow">已选：${sel ? cardChip(sel) : '<span class="muted">（未选）</span>'}</div>`;
       btn = "确认还贡";
