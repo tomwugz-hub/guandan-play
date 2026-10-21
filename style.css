@@ -274,3 +274,18 @@ body.tribOn .pz { visibility: hidden; }
   .pz .card.small { width: 40px; height: 56px; } .pz .fan .card + .card { margin-left: -24px; }
   .pz .card.small .cr { font-size: 15px; } .pz .card.small .pip { font-size: 20px; }
 }
+/* 手牌叠放：每张露出的横条同时显示点数和花色（如 A♥、K♣、大王） */
+.card .strip { display: none; }
+#hand .card .cr { display: none; }
+#hand .card .strip { display: block; position: absolute; left: 3px; top: 1px; font-size: 17px; line-height: 1; white-space: nowrap; letter-spacing: -1px; }
+#hand .card .strip .s { font-size: 16px; margin-left: 1px; letter-spacing: 0; }
+#hand .card.joker .strip { font-size: 14px; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; letter-spacing: 0; }
+#hand .card.wild .strip { color: #d0101e; }
+@media (max-height: 500px) and (orientation: landscape) {
+  #hand .card .strip { font-size: 14px; } #hand .card .strip .s { font-size: 13px; }
+  #hand .card.joker .strip { font-size: 12px; }
+}
+@media (max-width: 700px) and (orientation: portrait) {
+  #hand .card .strip { font-size: 14px; left: 2px; } #hand .card .strip .s { font-size: 13px; }
+  #hand .card.joker .strip { font-size: 11px; }
+}

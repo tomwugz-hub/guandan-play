@@ -3042,12 +3042,12 @@
     if (c.rank === "RJ" || c.rank === "BJ") {
       el.classList.add("joker");
       if (c.rank === "RJ") el.classList.add("red");
-      el.innerHTML = `<span class="cr">J<br>O<br>K<br>E<br>R</span><span class="jk">${c.rank === "RJ" ? "大王" : "小王"}</span>`;
+      el.innerHTML = `<span class="cr">J<br>O<br>K<br>E<br>R</span><span class="strip">${c.rank === "RJ" ? "大王" : "小王"}</span><span class="jk">${c.rank === "RJ" ? "大王" : "小王"}</span>`;
     } else {
       if (c.suit === "H" || c.suit === "D") el.classList.add("red");
       const sym = SUIT_SYM[c.suit] || "";
       const rk = c.rank === "T" ? "10" : c.rank;
-      el.innerHTML = `<span class="cr">${rk}<br><span class="s">${sym}</span></span><span class="pip">${sym}</span>`;
+      el.innerHTML = `<span class="cr">${rk}<br><span class="s">${sym}</span></span><span class="strip">${rk}<span class="s">${sym}</span></span><span class="pip">${sym}</span>`;
       if (c.rank === lv) el.classList.add("level");
       if (isWildCard(c, lv)) {
         el.classList.add("wild");
@@ -3144,7 +3144,7 @@
     }
     const maxStack = Math.max(1, ...cols.map((c) => c.cards.length));
     const maxH = shortLand ? Math.max(ch + 36, window.innerHeight * 0.3) : phone ? Math.max(ch + 60, window.innerHeight * 0.3) : 230;
-    const vStep = maxStack > 1 ? Math.max(14, Math.min(Math.round(ch * 0.3), (maxH - ch) / (maxStack - 1))) : 0;
+    const vStep = maxStack > 1 ? Math.max(shortLand ? 17 : 18, Math.min(Math.round(ch * 0.3), (maxH - ch) / (maxStack - 1))) : 0;
     const nc = cols.length;
     const step = nc > 1 ? Math.min(cw + 4, (W - cw) / (nc - 1)) : 0;
     const totalW = (nc - 1) * step + cw;
