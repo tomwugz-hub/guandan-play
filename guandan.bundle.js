@@ -1143,6 +1143,30 @@
     }
     return false;
   }
+  function r14Mode() {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a.GD_R14 : void 0;
+    return v == null ? 3 : Number(v) || 0;
+  }
+  function r14Hot(ctx) {
+    var _a, _b;
+    if (!r14Mode() || ctx.leading || !ctx.previous) return false;
+    const seat = (_a = ctx.seat) != null ? _a : 0;
+    const cts = ctx.remainingSeatCounts || [];
+    if (ctx.lastPlaySeat != null && ctx.lastPlaySeat === (seat + 2) % 4) return false;
+    if (ctx.partnerCombo) return false;
+    const pc = (_b = cts[(seat + 2) % 4]) != null ? _b : 27;
+    if (pc >= 1 && pc <= 5) return false;
+    if ((ctx.hand || []).length < 8) return false;
+    const shed = ctx.recentShed || [];
+    const my = (ctx.hand || []).length;
+    const mine = Math.min(my, pc || 27);
+    return [(seat + 1) % 4, (seat + 3) % 4].some((e) => {
+      var _a2;
+      const n = (_a2 = cts[e]) != null ? _a2 : 27;
+      return n >= 2 && (n <= 5 && my >= 13 || n >= 6 && n <= 11 && (shed[e] || 0) >= 6 || n >= 6 && n <= 13 && n <= mine - 4);
+    });
+  }
   function enemyShortCount(ctx) {
     var _a;
     const counts = ctx.remainingSeatCounts || ctx.opponentCounts || [27, 27, 27, 27];
@@ -1216,7 +1240,7 @@
       if (!onlyWay && !last && !win) return FORBID_TRACE.rule = "L201", true;
     }
     const enemyLast = enemyShortCount(ctx) <= 1;
-    if (bomb && prev && isSmallOrdinary(prev, ctx.levelRank) && !last && !win && !enemyLast && !(!partner && bombFinishOk(move, ctx, others, moveFinish(move, ctx)))) {
+    if (!(r14Mode() & 2 && r14Hot(ctx)) && bomb && prev && isSmallOrdinary(prev, ctx.levelRank) && !last && !win && !enemyLast && !(!partner && bombFinishOk(move, ctx, others, moveFinish(move, ctx)))) {
       if (canPass || sameTypeFollow || !onlyWay) return FORBID_TRACE.rule = "L208", true;
     }
     if (combo2.type === TYPES.STRAIGHT_FLUSH && prev && prev.type === TYPES.SINGLE && (prev.rank === "8" || prev.rank === "9") && !enemyLast) {
@@ -1235,7 +1259,7 @@
       const cts = ctx.remainingSeatCounts || [];
       const lastN = ctx.lastPlaySeat != null ? cts[ctx.lastPlaySeat] : null;
       const pc0 = cts[(seat0 + 2) % 4];
-      if (lastN != null && lastN >= 6 && !(pc0 === 1 || pc0 === 2) && enemyShortCount(ctx) >= 2) return FORBID_TRACE.rule = "L248", true;
+      if (!(r14Mode() & 2 && r14Hot(ctx)) && lastN != null && lastN >= 6 && !(pc0 === 1 || pc0 === 2) && enemyShortCount(ctx) >= 2) return FORBID_TRACE.rule = "L248", true;
     }
     if (ctx.leading && !bomb && !last && !win && (enemyShortCount(ctx) <= 3 || [1, 2].includes((_c = ctx.remainingSeatCounts) == null ? void 0 : _c[(((_b = ctx.seat) != null ? _b : 0) + 2) % 4]))) {
       const cnt = countByRank(ctx.hand || []);
@@ -1812,7 +1836,12 @@
       score -= 60;
       tags.push("noCounterBomb");
     }
-    if (!ctx.leading && isBombLike(move.combo) && ctx.previous && ORDINARY.has(ctx.previous.type) && enemyShort >= 4 && !emptiesHand(move, ctx.hand)) {
+    const r14h = r14Hot(ctx);
+    if (r14h && r14Mode() & 1 && isPass(move) && (allMoves || []).some((m) => !isPass(m) && !isBombLike(m.combo))) {
+      score -= 35;
+      tags.push("r14NoPass");
+    }
+    if (!(r14h && r14Mode() & 2) && !ctx.leading && isBombLike(move.combo) && ctx.previous && ORDINARY.has(ctx.previous.type) && enemyShort >= 4 && !emptiesHand(move, ctx.hand)) {
       score -= 150;
       tags.push("saveBomb");
     }
@@ -1949,6 +1978,7 @@
       );
       const hasOrphan = [...byRank.values()].some((n) => n === 1);
       const nextEnemyN = (_R = seatCounts[(((_Q = ctx.seat) != null ? _Q : 0) + 1) % 4]) != null ? _R : 27;
+      void nextEnemyN;
       const feedOk1 = partnerCount === 1 && !enemyCutsBeforePartner(ctx, 1);
       const feedPairAvail = partnerCount === 2 && enemyShort >= 3 && (allMoves || []).some((m) => {
         var _a2;
@@ -2746,6 +2776,18 @@
   function isOver(g) {
     return g.round.finished.length >= 4;
   }
+  function recentShedOf(r) {
+    const out = [0, 0, 0, 0], seen = [0, 0, 0, 0];
+    const t = r.tricks || [];
+    for (let i = t.length - 1; i >= 0; i--) {
+      const s = t[i].seat;
+      if (seen[s] < 2) {
+        seen[s]++;
+        out[s] += t[i].cards.length;
+      }
+    }
+    return out;
+  }
   function ctxFor(g, seat) {
     const r = g.round;
     const leading = isLeading(g);
@@ -2762,7 +2804,8 @@
       partnerCombo: leading ? null : partnerCombo,
       playedCards: g.played.slice(),
       persona: null,
-      lastPlaySeat: leading ? null : r.lastPlayer
+      lastPlaySeat: leading ? null : r.lastPlayer,
+      recentShed: recentShedOf(r)
     };
   }
   function coachMove(g, seat) {
