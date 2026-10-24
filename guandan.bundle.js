@@ -2810,7 +2810,23 @@
   }
   function coachMove(g, seat) {
     const rec = decide(ctxFor(g, seat));
-    return { move: rec.move, reason: rec.reason || "", text: moveText(rec.move) };
+    return { move: rec.move, reason: rec.reason || "", text: moveText(rec.move), scored: rec.scored || [], lv: g.match.levelRank };
+  }
+  var COACH_GAP_MIN = 12;
+  var eqKey = (m, lv) => isPassMove(m) ? "pass" : `${m.combo.type}:${m.combo.rank}:${m.cards.map((c) => isWildCard(c, lv) ? "*" : c.rank).sort().join(",")}`;
+  function moveGap(coach, move) {
+    const sc = (coach == null ? void 0 : coach.scored) || [];
+    if (!sc.length) return null;
+    const lv = coach.lv || "2";
+    const best = sc[0].score;
+    const k = moveKey(move), ek = eqKey(move, lv);
+    const hit = sc.find((x) => moveKey(x.move) === k) || sc.find((x) => eqKey(x.move, lv) === ek);
+    return hit ? Math.max(0, best - hit.score) : null;
+  }
+  function coachDiffInfo(coach, move) {
+    if (moveKey(coach.move) === moveKey(move)) return {};
+    const gap = moveGap(coach, move);
+    return { gap: gap == null ? null : Math.round(gap * 10) / 10, minor: gap != null && gap < COACH_GAP_MIN };
   }
   function snapshot(g, seat) {
     var _a, _b;
@@ -2879,7 +2895,7 @@
       seat,
       by,
       move: { text: moveText(move), cards: cards.map(formatCard), type: it.combo.type, rank: (_a = it.combo.rank) != null ? _a : null, size: cards.length },
-      coach: coach ? { text: moveText(coach.move), cards: (coach.move.cards || []).map(formatCard), type: ((_b = coach.move.combo) == null ? void 0 : _b.type) || "pass", rank: (_d = (_c = coach.move.combo) == null ? void 0 : _c.rank) != null ? _d : null, size: (coach.move.cards || []).length, reason: coach.reason, same: moveKey(coach.move) === moveKey(move) } : null,
+      coach: coach ? { text: moveText(coach.move), cards: (coach.move.cards || []).map(formatCard), type: ((_b = coach.move.combo) == null ? void 0 : _b.type) || "pass", rank: (_d = (_c = coach.move.combo) == null ? void 0 : _c.rank) != null ? _d : null, size: (coach.move.cards || []).length, reason: coach.reason, same: moveKey(coach.move) === moveKey(move), ...coachDiffInfo(coach, move) } : null,
       reason,
       snapshot: snap
     };
@@ -3284,7 +3300,7 @@
       const sp = document.createElement("span");
       sp.textContent = `${who}${eng}：${e.move.text}`;
       li.appendChild(sp);
-      if (e.by === "human" && e.coach && !e.coach.same) {
+      if (e.by === "human" && e.coach && !e.coach.same && !e.coach.minor) {
         li.classList.add("diff");
         li.title = `教练会出：${e.coach.text}`;
       }
@@ -3320,8 +3336,8 @@
     hintIds.clear();
     $("hintBox").textContent = "";
     const e = res.entry;
-    coachTip(e.coach.same ? "" : `你出：${e.move.text} · 教练会出：<b>${e.coach.text}</b>`);
-    $("feedback").innerHTML = e.coach.same ? `<div class="good">✔ 与教练一致：${e.move.text}</div>` : `<div class="bad">你出：${e.move.text}<br>教练会出：<b>${e.coach.text}</b><br><span class="muted">${e.coach.reason || ""}</span></div>`;
+    coachTip(e.coach.same || e.coach.minor ? "" : `你出：${e.move.text} · 教练会出：<b>${e.coach.text}</b>`);
+    $("feedback").innerHTML = e.coach.same ? `<div class="good">✔ 与教练一致：${e.move.text}</div>` : e.coach.minor ? `<div class="good minor">✔ ${e.move.text}（与教练的 ${e.coach.text} 差不多）</div>` : `<div class="bad">你出：${e.move.text}<br>教练会出：<b>${e.coach.text}</b><br><span class="muted">${e.coach.reason || ""}</span></div>`;
     afterMove(res);
   }
   function afterMove(res) {
