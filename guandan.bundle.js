@@ -1527,14 +1527,22 @@
     var _a;
     const c = move.combo;
     const parts = [];
-    if (isPass(move)) parts.push("当前跟牌没有合适同型，选择过牌保留结构。");
-    else {
+    let legalNow = null;
+    const lm = () => legalNow || (legalNow = ctx.hand && ctx.previous && !ctx.leading ? legalMoves(ctx.hand, ctx.previous, ctx.levelRank || "2", false).filter((m) => m.cards.length) : []);
+    if (isPass(move)) {
+      if (lm().some((m) => isBombLike(m.combo)) && !lm().some((m) => !isBombLike(m.combo))) parts.push("手里有炸弹能压，但现在动炸不划算，选择过牌保留炸弹。");
+      else if (lm().length) parts.push("手里有能压的牌，但现在压不划算，选择过牌保留结构。");
+      else parts.push("当前跟牌没有合适同型，选择过牌保留结构。");
+    } else {
       parts.push(`建议出 ${labelCombo(c)}。`);
     }
     if (tags.includes("goOut")) parts.push("手中仅剩 1–2 张，能走则走，避免留垃圾牌。");
     if (tags.includes("noFirstBomb")) parts.push("新开局首轮领出不应亮炸弹，留给关键时刻。");
     if (tags.includes("noWasteJ")) parts.push("四张 J 去压三带二是典型炸弹浪费。");
-    if (tags.includes("noSFon8")) parts.push("同花顺去压 8/9 单张收益极差。");
+    if (tags.includes("noSFon8") && ctx.hand && legalMoves(ctx.hand, null, ctx.levelRank || "2", true).some((m) => {
+      var _a2;
+      return ((_a2 = m.combo) == null ? void 0 : _a2.type) === TYPES.STRAIGHT_FLUSH;
+    })) parts.push("同花顺去压 8/9 单张收益极差。");
     if (tags.includes("vsTwo")) parts.push("对方只剩 2 张，避免拆三张散牌把自己暴露。");
     if (tags.includes("partner")) parts.push("搭档刚出普通牌，不要用炸弹/同花顺砸队友。");
     if (tags.includes("keepStruct")) parts.push("保留连对/钢板（飞机）完整性，无必要不拆。");
@@ -2805,7 +2813,8 @@
       playedCards: g.played.slice(),
       persona: null,
       lastPlaySeat: leading ? null : r.lastPlayer,
-      recentShed: recentShedOf(r)
+      recentShed: recentShedOf(r),
+      finishedOrder: r.finished.slice()
     };
   }
   function coachMove(g, seat) {
@@ -3574,6 +3583,11 @@
     return `guandan-game-${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}.${ext}`;
   }
   var BUILD = typeof document !== "undefined" && document.documentElement.dataset.build || null;
+  if (!BUILD && typeof caches !== "undefined") caches.keys().then((ks) => {
+    const k = ks.find((x) => x.startsWith("guandan-play-"));
+    if (k && !BUILD) BUILD = k;
+  }).catch(() => {
+  });
   function gameText() {
     var _a;
     const moves = ((G == null ? void 0 : G.history) || []).reduce((n, d) => n + d.log.length, 0) + (((_a = G == null ? void 0 : G.log) == null ? void 0 : _a.length) || 0);
