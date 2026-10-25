@@ -1513,6 +1513,210 @@
     return { comps, plays: comps.length, cost, counts: cnt0 };
   }
 
+  // policy/endgame.js
+  var keyRS = (c) => c.rank + c.suit;
+  function teamPts(order, team) {
+    const t = order[0] % 2;
+    const p = order[1] % 2 === t ? 3 : order[2] % 2 === t ? 2 : 1;
+    return t === team ? p : -p;
+  }
+  function rngOf(a) {
+    let b = a >>> 0;
+    return () => {
+      b = b + 1831565813 >>> 0;
+      let t = b;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  var nextActive = (fin, s) => {
+    for (let i = 1; i <= 4; i++) if (!fin.includes((s + i) % 4)) return (s + i) % 4;
+    return s;
+  };
+  function endgameApplies(ctx, maxEach = 3) {
+    var _a;
+    const cnt = ctx.remainingSeatCounts;
+    if (!cnt || cnt.length !== 4) return false;
+    const me = (_a = ctx.seat) != null ? _a : 0;
+    if ((ctx.hand || []).length < 2) return false;
+    if (cnt.some((c) => c > maxEach)) return false;
+    const fin = [0, 1, 2, 3].filter((s) => cnt[s] === 0);
+    if (fin.length >= 2 && !ctx.finishedOrder) return false;
+    if (fin.includes(me)) return false;
+    return true;
+  }
+  function solveEndgame(ctx, moves, { maxWorlds = 120, nodeBudget = 4e4, timeMs = 60, minWorlds = 6 } = {}) {
+    var _a;
+    const me = (_a = ctx.seat) != null ? _a : 0;
+    const lv = ctx.levelRank || "2";
+    const cnt = ctx.remainingSeatCounts.slice();
+    const finished = ctx.finishedOrder ? ctx.finishedOrder.slice() : [0, 1, 2, 3].filter((s) => cnt[s] === 0);
+    const pool = /* @__PURE__ */ new Map();
+    for (const c of makeDeck()) pool.set(keyRS(c), (pool.get(keyRS(c)) || 0) + 1);
+    for (const c of [...ctx.playedCards || [], ...ctx.hand || []]) {
+      const k = keyRS(c);
+      const v = pool.get(k) || 0;
+      if (v <= 0) return null;
+      pool.set(k, v - 1);
+    }
+    const unknown = [];
+    let uid = 9e5;
+    for (const [k, v] of pool) for (let i = 0; i < v; i++) {
+      const rank = k.startsWith("RJ") ? "RJ" : k.startsWith("BJ") ? "BJ" : k.slice(0, -1);
+      unknown.push({ rank, suit: k.slice(rank.length), id: uid++ });
+    }
+    const others = [0, 1, 2, 3].filter((s) => s !== me && cnt[s] > 0);
+    if (unknown.length !== others.reduce((a, s) => a + cnt[s], 0)) return null;
+    const worlds = [];
+    const seen = /* @__PURE__ */ new Set();
+    const enumAll = (idx, rest, acc) => {
+      if (worlds.length > 2e3) return;
+      if (idx === others.length) {
+        worlds.push(acc.map((a) => a.slice()));
+        return;
+      }
+      const need = cnt[others[idx]];
+      const choose = (start, pick) => {
+        if (pick.length === need) {
+          const used = new Set(pick);
+          const hand = pick.map((i) => rest[i]);
+          const hk = hand.map(keyRS).sort().join(",") + "|" + idx;
+          enumAll(idx + 1, rest.filter((_, i) => !used.has(i)), [...acc, hand]);
+          return hk;
+        }
+        for (let i = start; i < rest.length; i++) choose(i + 1, [...pick, i]);
+      };
+      choose(0, []);
+    };
+    enumAll(0, unknown, []);
+    let list = [];
+    for (const w of worlds) {
+      const k = w.map((h) => h.map(keyRS).sort().join(",")).join("|");
+      if (seen.has(k)) continue;
+      seen.add(k);
+      list.push(w);
+    }
+    if (list.length > maxWorlds) {
+      const rng = rngOf((ctx.hand || []).reduce((a, c) => a * 31 + c.rank.charCodeAt(0) + c.suit.charCodeAt(0), 7));
+      for (let i = list.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [list[i], list[j]] = [list[j], list[i]];
+      }
+      list = list.slice(0, maxWorlds);
+    }
+    const team = me % 2;
+    const lastPlayer = ctx.leading ? null : ctx.lastPlaySeat;
+    let passCount = 0;
+    if (!ctx.leading && lastPlayer != null) {
+      for (let s = (lastPlayer + 1) % 4; s !== me; s = (s + 1) % 4) if (!finished.includes(s)) passCount++;
+    }
+    let nodes = 0;
+    const handKey = (h) => h.map(keyRS).sort().join("");
+    const sum = /* @__PURE__ */ new Map();
+    const t0 = Date.now();
+    let done = 0;
+    for (const w of list) {
+      if (done >= minWorlds && Date.now() - t0 > timeMs) break;
+      nodes = 0;
+      const hands = [[], [], [], []];
+      hands[me] = ctx.hand.slice();
+      others.forEach((s, i) => {
+        hands[s] = w[i];
+      });
+      const memo = /* @__PURE__ */ new Map();
+      const search = (st) => {
+        var _a2;
+        if (++nodes > nodeBudget || (nodes & 255) === 0 && Date.now() - t0 > timeMs * 2) throw new Error("budget");
+        const key = st.hands.map(handKey).join("|") + st.cur + "|" + (st.last ? st.last.type + st.last.rank + ":" + st.last.size + ":" + ((_a2 = st.last.length) != null ? _a2 : "") : "-") + "|" + st.lp + "|" + st.pc + "|" + st.fin.join("");
+        const hit = memo.get(key);
+        if (hit !== void 0) return hit;
+        const mvs = legalMoves(st.hands[st.cur], st.last, lv, !st.last);
+        const maxi = st.cur % 2 === team;
+        let best2 = maxi ? -1e9 : 1e9;
+        for (const m of dedupe(mvs)) {
+          const v = step(st, m);
+          if (maxi ? v > best2 : v < best2) best2 = v;
+          if (maxi && best2 >= 3) break;
+          if (!maxi && best2 <= -3) break;
+        }
+        memo.set(key, best2);
+        return best2;
+      };
+      const step = (st, m) => {
+        const seat = st.cur;
+        if (!m.cards.length) {
+          const pc = st.pc + 1;
+          const active = 4 - st.fin.length;
+          const need = st.fin.includes(st.lp) ? active : active - 1;
+          if (pc >= need) {
+            let leader = st.lp;
+            if (st.fin.includes(leader)) {
+              const p = (leader + 2) % 4;
+              leader = st.fin.includes(p) ? nextActive(st.fin, leader) : p;
+            }
+            return search({ hands: st.hands, cur: leader, last: null, lp: leader, pc: 0, fin: st.fin });
+          }
+          return search({ ...st, cur: nextActive(st.fin, seat), pc });
+        }
+        const ids = new Set(m.cards.map((c) => c.id));
+        const hands2 = st.hands.slice();
+        hands2[seat] = hands2[seat].filter((c) => !ids.has(c.id));
+        let fin = st.fin;
+        if (!hands2[seat].length) fin = [...fin, seat];
+        const t02 = fin.includes(0) && fin.includes(2), t1 = fin.includes(1) && fin.includes(3);
+        if (fin.length >= 3 || t02 || t1) {
+          const rest = [0, 1, 2, 3].filter((s) => !fin.includes(s)).sort((a, b) => hands2[a].length - hands2[b].length);
+          return teamPts([...fin, ...rest], team);
+        }
+        return search({ hands: hands2, cur: nextActive(fin, seat), last: m.combo, lp: seat, pc: 0, fin });
+      };
+      const part = /* @__PURE__ */ new Map();
+      const root = { hands, cur: me, last: ctx.leading ? null : ctx.previous, lp: lastPlayer, pc: passCount, fin: finished };
+      try {
+        for (const m of moves) {
+          const real = { cards: m.cards.map((c) => hands[me].find((h) => h.id === c.id)).filter(Boolean), combo: m.combo };
+          if (real.cards.length !== m.cards.length) return null;
+          const v = step(root, real);
+          part.set(mkey(m), v);
+          sum.set(mkey(m), (sum.get(mkey(m)) || 0) + v);
+        }
+      } catch (e) {
+        for (const m of moves) {
+          const k = mkey(m);
+          if (part.has(k)) sum.set(k, sum.get(k) - part.get(k));
+        }
+        if (done >= 3) break;
+        return null;
+      }
+      done++;
+    }
+    if (!done) return null;
+    const values = new Map([...sum].map(([k, v]) => [k, v / done]));
+    let best = null, bv = -1e9;
+    for (const m of moves) {
+      const v = values.get(mkey(m));
+      if (v > bv + 1e-9) {
+        bv = v;
+        best = m;
+      }
+    }
+    return { values, best, bestValue: bv, worlds: done, nodes };
+  }
+  var mkey = (m) => {
+    var _a, _b, _c;
+    return (m.cards || []).map((c) => c.id).sort().join(",") + ":" + (((_a = m.combo) == null ? void 0 : _a.type) || TYPES.PASS) + ((_c = (_b = m.combo) == null ? void 0 : _b.rank) != null ? _c : "");
+  };
+  function dedupe(ms) {
+    const seen = /* @__PURE__ */ new Set();
+    return ms.filter((m) => {
+      const k = m.cards.map(keyRS).sort().join(",") + m.combo.type + m.combo.rank;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }
+
   // policy/index.js
   var LA_CACHE = /* @__PURE__ */ new WeakMap();
   function laCache(ctx) {
@@ -1524,7 +1728,7 @@
     return c;
   }
   function reasonFor(move, ctx, tags) {
-    var _a;
+    var _a, _b;
     const c = move.combo;
     const parts = [];
     let legalNow = null;
@@ -1543,12 +1747,13 @@
       var _a2;
       return ((_a2 = m.combo) == null ? void 0 : _a2.type) === TYPES.STRAIGHT_FLUSH;
     })) parts.push("同花顺去压 8/9 单张收益极差。");
+    if (tags.includes("endgame")) parts.push(`残局穷举${ctx._endgame ? `（${ctx._endgame.worlds} 种剩余牌分布）` : ""}：这样走期望最好${ctx._endgame ? `（本方期望 ${ctx._endgame.value.toFixed(2)} 级，原选 ${Number((_a = ctx._endgame.before) != null ? _a : 0).toFixed(2)}）` : ""}，含出完顺序、双上和接风。`);
     if (tags.includes("vsTwo")) parts.push("对方只剩 2 张，避免拆三张散牌把自己暴露。");
     if (tags.includes("partner")) parts.push("搭档刚出普通牌，不要用炸弹/同花顺砸队友。");
     if (tags.includes("keepStruct")) parts.push("保留连对/钢板（飞机）完整性，无必要不拆。");
     if (tags.includes("control")) parts.push("结合余牌与级牌，优先控场或安全过渡。");
     if (ctx.levelRank) parts.push(`当前级牌为 ${ctx.levelRank}（仅红桃级牌为逢人配）。`);
-    if ((_a = ctx.belief) == null ? void 0 : _a.keyCards) {
+    if ((_b = ctx.belief) == null ? void 0 : _b.keyCards) {
       const k = ctx.belief.keyCards;
       parts.push(`关键牌估计：2 余 ${k.twosLeft}，级牌余 ${k.levelLeft}，大王余 ${k.redJokerLeft}。`);
     }
@@ -2340,7 +2545,7 @@
     return { score, tags };
   }
   function decide(ctx = {}) {
-    var _a, _b;
+    var _a, _b, _c, _d, _e;
     const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
     const belief = ctx.belief || buildBelief(ctx);
     const full = { ...ctx, belief };
@@ -2381,7 +2586,25 @@
       }
     }
     ranked.sort((a, b) => b.score - a.score);
-    if (typeof process !== "undefined" && ((_a = process.env) == null ? void 0 : _a.DECIDE_DEBUG)) for (const r of ranked.slice(0, Number(process.env.DECIDE_DEBUG) > 1 ? Number(process.env.DECIDE_DEBUG) : 6)) console.error("[decide]", (_b = r.move.combo) == null ? void 0 : _b.type, r.move.cards.map((c) => c.rank).join(""), r.score.toFixed(1), r.tags.join(","));
+    if (R7("GD_R19F", 1) && endgameApplies(full)) {
+      const all = uniqueByCards(cands);
+      const eg = solveEndgame(full, all);
+      if (eg && eg.best && eg.bestValue > ((_a = eg.values.get(mkey(best))) != null ? _a : -1e9) + 0.01) {
+        const before = eg.values.get(mkey(best));
+        best = eg.best;
+        bestTags = ["endgame"];
+        full._endgame = { value: eg.bestValue, before, worlds: eg.worlds };
+        const i = ranked.findIndex((r) => sameMove(r.move, best));
+        const top = (_c = (_b = ranked[0]) == null ? void 0 : _b.score) != null ? _c : 0;
+        if (i >= 0) {
+          const [r] = ranked.splice(i, 1);
+          r.score = top + 1;
+          r.tags = ["endgame"];
+          ranked.unshift(r);
+        } else ranked.unshift({ move: best, score: top + 1, tags: ["endgame"] });
+      }
+    }
+    if (typeof process !== "undefined" && ((_d = process.env) == null ? void 0 : _d.DECIDE_DEBUG)) for (const r of ranked.slice(0, Number(process.env.DECIDE_DEBUG) > 1 ? Number(process.env.DECIDE_DEBUG) : 6)) console.error("[decide]", (_e = r.move.combo) == null ? void 0 : _e.type, r.move.cards.map((c) => c.rank).join(""), r.score.toFixed(1), r.tags.join(","));
     const ms = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0;
     return {
       move: best,
@@ -2921,14 +3144,14 @@
         let leader = r.lastPlayer;
         if (r.finished.includes(leader)) {
           const p = (leader + 2) % 4;
-          leader = r.finished.includes(p) ? nextActive(r, leader) : p;
+          leader = r.finished.includes(p) ? nextActive2(r, leader) : p;
         }
         r.currentSeat = leader;
         r.leadSeat = leader;
         g.trickPlays = [];
         entry.trickEnd = true;
       } else {
-        r.currentSeat = nextActive(r, seat);
+        r.currentSeat = nextActive2(r, seat);
       }
       return { ok: true, entry };
     }
@@ -2957,10 +3180,10 @@
       finishDeal(g);
       return { ok: true, entry, finished: true };
     }
-    r.currentSeat = nextActive(r, seat);
+    r.currentSeat = nextActive2(r, seat);
     return { ok: true, entry };
   }
-  function nextActive(r, seat) {
+  function nextActive2(r, seat) {
     for (let i = 1; i <= 4; i++) {
       const s = (seat + i) % 4;
       if (!r.finished.includes(s)) return s;
