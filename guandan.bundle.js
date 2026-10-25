@@ -5,6 +5,12 @@
   var JOKER_RED = "RJ";
   var SUITS = ["S", "H", "D", "C"];
   var SEQ_RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
+  function seqWindows(len) {
+    const out = [];
+    for (let s = 0; s + len <= SEQ_RANKS.length; s++) out.push(SEQ_RANKS.slice(s, s + len));
+    if (len >= 2) out.push(["A", ...SEQ_RANKS.slice(0, len - 1)]);
+    return out;
+  }
   function isJokerRank(rank) {
     return rank === JOKER_BLACK || rank === JOKER_RED;
   }
@@ -199,11 +205,7 @@
     return null;
   }
   function sequenceWindows(len) {
-    const out = [];
-    for (let start = 0; start + len <= SEQ_RANKS.length; start++) {
-      out.push(SEQ_RANKS.slice(start, start + len));
-    }
-    return out;
+    return seqWindows(len);
   }
   function asStraight(cards, levelRank) {
     const n = cards.length;
@@ -369,6 +371,11 @@
   function compareRank(aRank, bRank, levelRank) {
     return singleStrength(aRank, levelRank) - singleStrength(bRank, levelRank);
   }
+  var SEQ_TYPES = /* @__PURE__ */ new Set([TYPES.STRAIGHT, TYPES.STRAIGHT_FLUSH, TYPES.PAIR_SEQ, TYPES.TRIPLE_SEQ]);
+  function compareHead(a, b, levelRank) {
+    if (SEQ_TYPES.has(a.type) && a.type === b.type) return SEQ_RANKS.indexOf(a.rank) - SEQ_RANKS.indexOf(b.rank);
+    return compareRank(a.rank, b.rank, levelRank);
+  }
   function compareCombos(a, b, levelRank) {
     var _a, _b;
     if (!a && !b) return 0;
@@ -382,14 +389,14 @@
     if (aB && bB) {
       const dw = bombWeight(a) - bombWeight(b);
       if (dw !== 0) return dw;
-      return compareRank(a.rank, b.rank, levelRank);
+      return compareHead(a, b, levelRank);
     }
     if (aB && !bB) return 1;
     if (!aB && bB) return -1;
     if (a.type !== b.type) return NaN;
     if (((_a = a.length) != null ? _a : a.size) !== ((_b = b.length) != null ? _b : b.size)) return NaN;
     if (a.size !== b.size && a.type !== TYPES.BOMB) return NaN;
-    return compareRank(a.rank, b.rank, levelRank);
+    return compareHead(a, b, levelRank);
   }
   function beats(a, b, levelRank) {
     if (!a || a.type === TYPES.PASS) return false;
@@ -515,8 +522,7 @@
       }
     }
     const byRank = groups;
-    for (let i = 0; i + 5 <= SEQ_RANKS.length; i++) {
-      const win = SEQ_RANKS.slice(i, i + 5);
+    for (const win of seqWindows(5)) {
       const cards = [];
       let need = 0;
       let ok = true;
@@ -616,12 +622,8 @@
       cards.push(...wilds.slice(0, need));
       emitIf(hand, cards, previous, levelRank, leading, out);
     };
-    for (let i = 0; i + 3 <= SEQ_RANKS.length; i++) {
-      tryWindow(SEQ_RANKS.slice(i, i + 3), 2);
-    }
-    for (let i = 0; i + 2 <= SEQ_RANKS.length; i++) {
-      tryWindow(SEQ_RANKS.slice(i, i + 2), 3);
-    }
+    for (const win of seqWindows(3)) tryWindow(win, 2);
+    for (const win of seqWindows(2)) tryWindow(win, 3);
     return uniqueMoves(out);
   }
   function generateCandidates(ctx) {
@@ -1092,6 +1094,11 @@
   function emptiesHand(move, hand) {
     return move.cards && hand && move.cards.length === hand.length && move.cards.length > 0;
   }
+  function r21Mode() {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a.GD_R21 : void 0;
+    return v == null ? 1 : Number(v) || 0;
+  }
   function detectStructures(hand, _levelRank) {
     const cnt = countByRank(hand);
     const pairRanks = [];
@@ -1117,8 +1124,9 @@
       }
       return [...out];
     };
-    const seqPairs = runRanks(pairRanks, 3);
-    const seqTrips = runRanks(tripRanks, 2);
+    const noBomb = r21Mode() & 1 ? (r) => (cnt.get(r) || 0) < 4 : () => true;
+    const seqPairs = runRanks(pairRanks.filter(noBomb), 3);
+    const seqTrips = runRanks(hand.length >= 15 ? tripRanks.filter(noBomb) : tripRanks, 2);
     return {
       pairRanks,
       tripRanks,
@@ -1747,7 +1755,7 @@
     return c;
   }
   function reasonFor(move, ctx, tags) {
-    var _a, _b;
+    var _a, _b, _c;
     const c = move.combo;
     const parts = [];
     let legalNow = null;
@@ -1759,20 +1767,21 @@
     } else {
       parts.push(`建议出 ${labelCombo(c)}。`);
     }
-    if (tags.includes("goOut")) parts.push("手中仅剩 1–2 张，能走则走，避免留垃圾牌。");
+    if (tags.includes("goOut")) parts.push((((_a = move.cards) == null ? void 0 : _a.length) || 0) > 2 ? "整手可一次走完，直接出完。" : "手中仅剩 1–2 张，能走则走，避免留垃圾牌。");
+    if (tags.includes("r21LonePair")) parts.push("开局先走孤立小对，不拆对子去凑中段顺子。");
     if (tags.includes("noFirstBomb")) parts.push("新开局首轮领出不应亮炸弹，留给关键时刻。");
     if (tags.includes("noWasteJ")) parts.push("四张 J 去压三带二是典型炸弹浪费。");
     if (tags.includes("noSFon8") && ctx.hand && legalMoves(ctx.hand, null, ctx.levelRank || "2", true).some((m) => {
       var _a2;
       return ((_a2 = m.combo) == null ? void 0 : _a2.type) === TYPES.STRAIGHT_FLUSH;
     })) parts.push("同花顺去压 8/9 单张收益极差。");
-    if (tags.includes("endgame")) parts.push(`残局穷举${ctx._endgame ? `（${ctx._endgame.worlds} 种剩余牌分布）` : ""}：这样走期望最好${ctx._endgame ? `（本方期望 ${ctx._endgame.value.toFixed(2)} 级，原选 ${Number((_a = ctx._endgame.before) != null ? _a : 0).toFixed(2)}）` : ""}，含出完顺序、双上和接风。`);
+    if (tags.includes("endgame")) parts.push(`残局穷举${ctx._endgame ? `（${ctx._endgame.worlds} 种剩余牌分布）` : ""}：这样走期望最好${ctx._endgame ? `（本方期望 ${ctx._endgame.value.toFixed(2)} 级，原选 ${Number((_b = ctx._endgame.before) != null ? _b : 0).toFixed(2)}）` : ""}，含出完顺序、双上和接风。`);
     if (tags.includes("vsTwo")) parts.push("对方只剩 2 张，避免拆三张散牌把自己暴露。");
     if (tags.includes("partner")) parts.push("搭档刚出普通牌，不要用炸弹/同花顺砸队友。");
     if (tags.includes("keepStruct")) parts.push("保留连对/钢板（飞机）完整性，无必要不拆。");
     if (tags.includes("control")) parts.push("结合余牌与级牌，优先控场或安全过渡。");
     if (ctx.levelRank) parts.push(`当前级牌为 ${ctx.levelRank}（仅红桃级牌为逢人配）。`);
-    if ((_b = ctx.belief) == null ? void 0 : _b.keyCards) {
+    if ((_c = ctx.belief) == null ? void 0 : _c.keyCards) {
       const k = ctx.belief.keyCards;
       parts.push(`关键牌估计：2 余 ${k.twosLeft}，级牌余 ${k.levelLeft}，大王余 ${k.redJokerLeft}。`);
     }
@@ -2589,7 +2598,7 @@
     return { score, tags };
   }
   function decide(ctx = {}) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
     const belief = ctx.belief || buildBelief(ctx);
     const full = { ...ctx, belief };
@@ -2603,16 +2612,20 @@
     const outs = cands.filter((m) => emptiesHand(m, full.hand));
     if (outs.length) {
       const move = outs[0];
+      const scoredOut = scoreAllForGap(move, uniqueByCards(withPass(cands, full)), full);
       return {
         move,
         reason: reasonFor(move, full, ["goOut"]),
         alternatives: cands.filter((m) => m !== move).slice(0, 3),
+        tags: ["goOut"],
+        scored: scoredOut,
         ms: (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0
       };
     }
     const beam = beamSearch(full, { beam: 10, timeMs: 20 });
     let pool = uniqueByCards(cands);
     const allowed = pool.filter((m) => !isForbidden(m, full, pool));
+    const filteredOut = allowed.length ? pool.filter((m) => !allowed.includes(m)) : [];
     if (allowed.length) pool = allowed;
     let best = pool[0];
     let bestS = -1e15;
@@ -2630,16 +2643,40 @@
       }
     }
     ranked.sort((a, b) => b.score - a.score);
+    if (r21Mode() & 2 && full.leading && (((_a = full.hand) == null ? void 0 : _a.length) || 0) >= 20 && ((_c = (_b = ranked[0]) == null ? void 0 : _b.move.combo) == null ? void 0 : _c.type) === TYPES.STRAIGHT) {
+      const lvR = full.levelRank || "2";
+      const cntR = /* @__PURE__ */ new Map();
+      for (const c of full.hand) if (!isWildCard(c, lvR)) cntR.set(c.rank, (cntR.get(c.rank) || 0) + 1);
+      const st = ranked[0].move;
+      const broken = st.cards.filter((c) => !isWildCard(c, lvR) && (cntR.get(c.rank) || 0) >= 2 && (cntR.get(c.rank) || 0) < 4).length;
+      if (broken >= 2 && ["10", "J", "Q"].includes(st.combo.rank)) {
+        const LOWP = ["3", "4", "5", "6", "7"];
+        const lone = ranked.filter((r) => {
+          var _a2;
+          return ((_a2 = r.move.combo) == null ? void 0 : _a2.type) === TYPES.PAIR && LOWP.includes(r.move.combo.rank) && r.move.combo.rank !== lvR && cntR.get(r.move.combo.rank) === 2 && !r.move.cards.some((c) => isWildCard(c, lvR)) && !st.cards.some((c) => c.rank === r.move.combo.rank) && r.score > -1e5;
+        });
+        if (lone.length) {
+          lone.sort((a, b) => LOWP.indexOf(a.move.combo.rank) - LOWP.indexOf(b.move.combo.rank));
+          const pick = lone[0];
+          pick.score = ranked[0].score + 1;
+          pick.tags = pick.tags.concat("r21LonePair");
+          ranked.sort((a, b) => b.score - a.score);
+          best = pick.move;
+          bestTags = pick.tags;
+          bestS = pick.score;
+        }
+      }
+    }
     if (R7("GD_R19F", 1) && endgameApplies(full)) {
       const all = uniqueByCards(cands);
       const eg = solveEndgame(full, all);
-      if (eg && eg.best && eg.bestValue > ((_a = eg.values.get(mkey(best))) != null ? _a : -1e9) + 0.01) {
+      if (eg && eg.best && eg.bestValue > ((_d = eg.values.get(mkey(best))) != null ? _d : -1e9) + 0.01) {
         const before = eg.values.get(mkey(best));
         best = eg.best;
         bestTags = ["endgame"];
         full._endgame = { value: eg.bestValue, before, worlds: eg.worlds };
         const i = ranked.findIndex((r) => sameMove(r.move, best));
-        const top = (_c = (_b = ranked[0]) == null ? void 0 : _b.score) != null ? _c : 0;
+        const top = (_f = (_e = ranked[0]) == null ? void 0 : _e.score) != null ? _f : 0;
         if (i >= 0) {
           const [r] = ranked.splice(i, 1);
           r.score = top + 1;
@@ -2648,16 +2685,56 @@
         } else ranked.unshift({ move: best, score: top + 1, tags: ["endgame"] });
       }
     }
-    if (typeof process !== "undefined" && ((_d = process.env) == null ? void 0 : _d.DECIDE_DEBUG)) for (const r of ranked.slice(0, Number(process.env.DECIDE_DEBUG) > 1 ? Number(process.env.DECIDE_DEBUG) : 6)) console.error("[decide]", (_e = r.move.combo) == null ? void 0 : _e.type, r.move.cards.map((c) => c.rank).join(""), r.score.toFixed(1), r.tags.join(","));
+    if (typeof process !== "undefined" && ((_g = process.env) == null ? void 0 : _g.DECIDE_DEBUG)) for (const r of ranked.slice(0, Number(process.env.DECIDE_DEBUG) > 1 ? Number(process.env.DECIDE_DEBUG) : 6)) console.error("[decide]", (_h = r.move.combo) == null ? void 0 : _h.type, r.move.cards.map((c) => c.rank).join(""), r.score.toFixed(1), r.tags.join(","));
     const ms = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0;
     return {
       move: best,
       reason: reasonFor(best, full, bestTags),
       alternatives: ranked.slice(1, 4).map((r) => r.move),
       tags: bestTags,
-      scored: ranked.slice(0, 40).map((r) => ({ move: r.move, tags: r.tags, score: r.score })),
+      scored: gapScored(ranked, filteredOut, full, pool),
       ms
     };
+  }
+  function withPass(cands, ctx) {
+    if (ctx.leading || !ctx.previous || ctx.previous.type === TYPES.PASS) return cands;
+    if (cands.some((m) => isPass(m))) return cands;
+    return cands.concat([{ cards: [], combo: { type: TYPES.PASS, rank: null, size: 0 } }]);
+  }
+  function gapScored(ranked, filteredOut, ctx, pool) {
+    var _a, _b;
+    const out = ranked.map((r) => ({ move: r.move, tags: r.tags, score: r.score }));
+    const low = out.length ? out[out.length - 1].score : 0;
+    const extra = filteredOut.slice();
+    if (!ctx.leading && ctx.previous && ctx.previous.type !== TYPES.PASS && !pool.concat(extra).some((m) => isPass(m))) extra.push({ cards: [], combo: { type: TYPES.PASS, rank: null, size: 0 } });
+    for (const m of extra) {
+      let sc;
+      try {
+        sc = scoreMove(m, ctx, pool).score;
+      } catch {
+        sc = low;
+      }
+      out.push({ move: m, tags: ["filtered"], score: Math.min(sc, ((_b = (_a = out[0]) == null ? void 0 : _a.score) != null ? _b : sc) - 6) });
+    }
+    return out;
+  }
+  function scoreAllForGap(exit, cands, ctx) {
+    const out = [];
+    for (const m of cands) {
+      let sc;
+      try {
+        sc = scoreMove(m, ctx, cands).score;
+      } catch {
+        sc = -1e6;
+      }
+      out.push({ move: m, tags: m === exit ? ["goOut"] : [], score: sc });
+    }
+    const top = Math.max(...out.map((r) => r.score));
+    const e = out.find((r) => r.move === exit);
+    if (e) e.score = top + 1;
+    else out.push({ move: exit, tags: ["goOut"], score: top + 1 });
+    out.sort((a, b) => b.score - a.score);
+    return out;
   }
   function sameMove(a, b) {
     var _a, _b;
