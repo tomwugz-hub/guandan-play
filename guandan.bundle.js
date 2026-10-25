@@ -2488,6 +2488,11 @@
     if (!pc.has("__plan")) pc.set("__plan", decompose(ctx.hand || [], ctx.levelRank || "2", pc));
     return pc.get("__plan");
   }
+  var r22Mode = () => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a.GD_R22 : void 0;
+    return v == null ? 1 : Number(v) || 0;
+  };
   var R7 = (k, d) => {
     var _a;
     const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a[k] : void 0;
@@ -2598,7 +2603,7 @@
     return { score, tags };
   }
   function decide(ctx = {}) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
     const belief = ctx.belief || buildBelief(ctx);
     const full = { ...ctx, belief };
@@ -2667,16 +2672,77 @@
         }
       }
     }
+    const r22 = r22Mode();
+    if (r22 & 1 && full.leading && (((_d = full.hand) == null ? void 0 : _d.length) || 0) <= 12) {
+      const hand = full.hand;
+      const lvR = full.levelRank || "2";
+      const ids = (cs) => cs.map((c) => c.id).sort().join(",");
+      for (const r of ranked.slice()) {
+        const y = r.move;
+        if (!y.cards.length || isBombLike(y.combo) || r.score < -1e5) continue;
+        const rest = restAfter(hand, y);
+        if (!rest.length) continue;
+        const restId = ids(rest);
+        const xs = legalMoves(rest, null, lvR, true).filter((x) => ids(x.cards) === restId);
+        const ok = xs.some((x) => isBombLike(x.combo) || x.combo.type === y.combo.type && x.combo.rank === "RJ" && (y.combo.type === TYPES.SINGLE || y.combo.type === TYPES.PAIR));
+        if (!ok) continue;
+        const top = ranked[0];
+        if (top.move === y) break;
+        if (ids(top.move.cards) !== restId) break;
+        r.score = top.score + 1;
+        r.tags = r.tags.concat("r22WeakFirst");
+        ranked.sort((a, b) => b.score - a.score);
+        best = r.move;
+        bestTags = r.tags;
+        bestS = r.score;
+        break;
+      }
+    }
+    if (r22 & 2 && !full.leading && ((_e = full.previous) == null ? void 0 : _e.type) === TYPES.SINGLE && ((_g = (_f = ranked[0]) == null ? void 0 : _f.move.combo) == null ? void 0 : _g.type) === TYPES.SINGLE) {
+      const hand = full.hand;
+      const lvR = full.levelRank || "2";
+      const ORD = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
+      const wins = (h) => {
+        const has = new Set(h.filter((c) => !isWildCard(c, lvR) && !isJokerRank(c.rank)).map((c) => c.rank));
+        const out = [];
+        for (let i = 0; i + 5 <= ORD.length; i++) if (ORD.slice(i, i + 5).every((x) => has.has(x))) out.push(i);
+        return out;
+      };
+      const cnt = /* @__PURE__ */ new Map();
+      for (const c of hand) cnt.set(c.rank, (cnt.get(c.rank) || 0) + 1);
+      const w0 = wins(hand);
+      const breaks = (m) => {
+        const w1 = new Set(wins(restAfter(hand, m)));
+        return w0.some((i) => !w1.has(i));
+      };
+      if (w0.length && breaks(ranked[0].move)) {
+        const top = ranked[0];
+        const alt = ranked.filter((r) => {
+          var _a2;
+          return ((_a2 = r.move.combo) == null ? void 0 : _a2.type) === TYPES.SINGLE && r.score > -1e5 && r.score >= top.score - R7("GD_R22_M", 90) && !isWildCard(r.move.cards[0], lvR) && !isJokerRank(r.move.cards[0].rank) && r.move.cards[0].rank !== lvR && (cnt.get(r.move.cards[0].rank) || 0) < 4 && !breaks(r.move) && (!(r22 & 4) || (cnt.get(r.move.cards[0].rank) || 0) >= 2 && w0.some((i) => ORD.slice(i, i + 5).includes(r.move.cards[0].rank)));
+        });
+        if (alt.length) {
+          alt.sort((a, b) => singleStrength(a.move.cards[0].rank, lvR) - singleStrength(b.move.cards[0].rank, lvR));
+          const pick = alt[0];
+          pick.score = top.score + 1;
+          pick.tags = pick.tags.concat("r22KeepStraight");
+          ranked.sort((a, b) => b.score - a.score);
+          best = pick.move;
+          bestTags = pick.tags;
+          bestS = pick.score;
+        }
+      }
+    }
     if (R7("GD_R19F", 1) && endgameApplies(full)) {
       const all = uniqueByCards(cands);
       const eg = solveEndgame(full, all);
-      if (eg && eg.best && eg.bestValue > ((_d = eg.values.get(mkey(best))) != null ? _d : -1e9) + 0.01) {
+      if (eg && eg.best && eg.bestValue > ((_h = eg.values.get(mkey(best))) != null ? _h : -1e9) + 0.01) {
         const before = eg.values.get(mkey(best));
         best = eg.best;
         bestTags = ["endgame"];
         full._endgame = { value: eg.bestValue, before, worlds: eg.worlds };
         const i = ranked.findIndex((r) => sameMove(r.move, best));
-        const top = (_f = (_e = ranked[0]) == null ? void 0 : _e.score) != null ? _f : 0;
+        const top = (_j = (_i = ranked[0]) == null ? void 0 : _i.score) != null ? _j : 0;
         if (i >= 0) {
           const [r] = ranked.splice(i, 1);
           r.score = top + 1;
@@ -2685,7 +2751,7 @@
         } else ranked.unshift({ move: best, score: top + 1, tags: ["endgame"] });
       }
     }
-    if (typeof process !== "undefined" && ((_g = process.env) == null ? void 0 : _g.DECIDE_DEBUG)) for (const r of ranked.slice(0, Number(process.env.DECIDE_DEBUG) > 1 ? Number(process.env.DECIDE_DEBUG) : 6)) console.error("[decide]", (_h = r.move.combo) == null ? void 0 : _h.type, r.move.cards.map((c) => c.rank).join(""), r.score.toFixed(1), r.tags.join(","));
+    if (typeof process !== "undefined" && ((_k = process.env) == null ? void 0 : _k.DECIDE_DEBUG)) for (const r of ranked.slice(0, Number(process.env.DECIDE_DEBUG) > 1 ? Number(process.env.DECIDE_DEBUG) : 6)) console.error("[decide]", (_l = r.move.combo) == null ? void 0 : _l.type, r.move.cards.map((c) => c.rank).join(""), r.score.toFixed(1), r.tags.join(","));
     const ms = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0;
     return {
       move: best,
