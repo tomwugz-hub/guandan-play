@@ -1,5 +1,5 @@
 /* 离线缓存：首次打开后即可离线使用（添加到主屏幕）。版本号由打包脚本写入。 */
-const CACHE = 'guandan-play-ab08571131';
+const CACHE = 'guandan-play-5ed1309363';
 const FILES = ['./', './index.html', './style.css', './guandan.bundle.js', './manifest.json',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
