@@ -1167,6 +1167,21 @@
       return n >= 2 && (n <= 5 && my >= 13 || n >= 6 && n <= 11 && (shed[e] || 0) >= 6 || n >= 6 && n <= 13 && n <= mine - 4);
     });
   }
+  function r20Mode() {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a.GD_R20 : void 0;
+    return v == null ? 15 : Number(v) || 0;
+  }
+  function r20Counter(move, ctx) {
+    var _a, _b;
+    if (!(r20Mode() & 1) || ctx.leading || !ctx.previous || !isBombLike(ctx.previous) || !isBombLike(move.combo)) return false;
+    if (resolvePartnerCombo(ctx)) return false;
+    const seat = (_a = ctx.seat) != null ? _a : 0;
+    const cts = ctx.remainingSeatCounts || [];
+    const pc = (_b = cts[(seat + 2) % 4]) != null ? _b : 27;
+    if ((move.cards || []).some((c) => isWildCard(c, ctx.levelRank || "2"))) return false;
+    return pc >= 1 && pc <= 6;
+  }
   function enemyShortCount(ctx) {
     var _a;
     const counts = ctx.remainingSeatCounts || ctx.opponentCounts || [27, 27, 27, 27];
@@ -1259,7 +1274,7 @@
       const cts = ctx.remainingSeatCounts || [];
       const lastN = ctx.lastPlaySeat != null ? cts[ctx.lastPlaySeat] : null;
       const pc0 = cts[(seat0 + 2) % 4];
-      if (!(r14Mode() & 2 && r14Hot(ctx)) && lastN != null && lastN >= 6 && !(pc0 === 1 || pc0 === 2) && enemyShortCount(ctx) >= 2) return FORBID_TRACE.rule = "L248", true;
+      if (!(r14Mode() & 2 && r14Hot(ctx)) && !r20Counter(move, ctx) && lastN != null && lastN >= 6 && !(pc0 === 1 || pc0 === 2) && enemyShortCount(ctx) >= 2) return FORBID_TRACE.rule = "L248", true;
     }
     if (ctx.leading && !bomb && !last && !win && (enemyShortCount(ctx) <= 3 || [1, 2].includes((_c = ctx.remainingSeatCounts) == null ? void 0 : _c[(((_b = ctx.seat) != null ? _b : 0) + 2) % 4]))) {
       const cnt = countByRank(ctx.hand || []);
@@ -1311,7 +1326,7 @@
     return !(others || []).some((m) => !isBombLike(m.combo) && moveFinish(m, ctx));
   }
   function partnerOverrideOk(move, ctx, prev) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g;
     const hand = ctx.hand || [];
     const lv = ctx.levelRank || "2";
     const ids = new Set((move.cards || []).map((c) => c.id));
@@ -1319,16 +1334,20 @@
     if (!rest.length) return true;
     const natCnt = (r) => hand.filter((c) => c.rank === r && (isJokerRank(c.rank) || !isWildCard(c, lv))).length;
     const breaksNatBomb = !isBombLike(move.combo) && (move.cards || []).some((c) => !isJokerRank(c.rank) && !isWildCard(c, lv) && natCnt(c.rank) >= 4 && natCnt(c.rank) - (move.cards || []).filter((x) => x.rank === c.rank && !isWildCard(x, lv)).length < 4);
+    if (r20Mode() & 8) {
+      const pc8 = (_b = (ctx.remainingSeatCounts || [])[(((_a = ctx.seat) != null ? _a : 0) + 2) % 4]) != null ? _b : 27;
+      if (pc8 >= 1 && pc8 <= 2 && (prev == null ? void 0 : prev.type) !== TYPES.SINGLE && enemyShortCount(ctx) >= 3) return moveFinish(move, ctx) === "sure";
+    }
     if (minPlays(rest, lv) <= 1 && !breaksNatBomb) return true;
     {
       const f = moveFinish(move, ctx);
       if (f === "sure") return true;
     }
-    const seat = (_a = ctx.seat) != null ? _a : 0;
+    const seat = (_c = ctx.seat) != null ? _c : 0;
     const counts = ctx.remainingSeatCounts || [];
-    const partnerCount = (_b = counts[(seat + 2) % 4]) != null ? _b : 27;
-    const nextEnemy = (_c = counts[(seat + 1) % 4]) != null ? _c : 27;
-    const partnerFirst = /partner/i.test(((_d = ctx.persona) == null ? void 0 : _d.style) || "") || /护搭档|partner/i.test(((_e = ctx.persona) == null ? void 0 : _e.brief) || "");
+    const partnerCount = (_d = counts[(seat + 2) % 4]) != null ? _d : 27;
+    const nextEnemy = (_e = counts[(seat + 1) % 4]) != null ? _e : 27;
+    const partnerFirst = /partner/i.test(((_f = ctx.persona) == null ? void 0 : _f.style) || "") || /护搭档|partner/i.test(((_g = ctx.persona) == null ? void 0 : _g.brief) || "");
     if (partnerFirst) return false;
     const size = Array.isArray(prev == null ? void 0 : prev.cards) && prev.cards.length || (prev == null ? void 0 : prev.size) || ((prev == null ? void 0 : prev.type) === "pair" ? 2 : 1);
     const cnt = countByRank(hand);
@@ -1817,7 +1836,7 @@
     return partner.type === prev.type && ((_a = partner.rank) != null ? _a : null) === ((_b = prev.rank) != null ? _b : null);
   }
   function scoreMove(move, ctx, allMoves) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja;
     const tags = [];
     if (isForbidden(move, ctx, allMoves)) return { score: -1e6, tags: ["forbidden"] };
     const struct = ctx._struct || detectStructures(ctx.hand || [], ctx.levelRank);
@@ -2046,8 +2065,29 @@
       if (winThenGood) tags.push(`winThen:${winThenGood}`);
     }
     if (!ctx.leading && isBombLike(move.combo) && ctx.previous && isBombLike(ctx.previous) && !partner && enemyShort >= 4 && !emptiesHand(move, ctx.hand) && !moveFinish(move, ctx, laCache(ctx))) {
-      score -= 60;
-      tags.push("noCounterBomb");
+      if (r20Counter(move, ctx)) {
+        score += R7("GD_R20_CB", 40);
+        tags.push("r20Counter");
+      } else {
+        score -= 60;
+        tags.push("noCounterBomb");
+      }
+    } else if (r20Counter(move, ctx)) {
+      score += R7("GD_R20_CB", 40);
+      tags.push("r20Counter");
+    }
+    if (r20Mode() & 2 && !ctx.leading && ((_E = ctx.previous) == null ? void 0 : _E.type) === TYPES.SINGLE && ctx.previous.rank === "BJ" && !partner && ((_F = move.combo) == null ? void 0 : _F.type) === TYPES.SINGLE && move.combo.rank === "RJ" && hand.length <= 15 && !emptiesHand(move, hand) && minPlays(restAfter(hand, move), levelRank) <= R7("GD_R20_RP", 4)) {
+      score += R7("GD_R20_RJ", 30);
+      tags.push("r20Seize");
+    }
+    if (r20Mode() & 4 && ctx.leading && !isPass(move) && !isBombLike(move.combo) && hand.length <= 10 && !emptiesHand(move, hand)) {
+      const wilds = hand.filter((c) => isWildCard(c, levelRank)).length;
+      const bombR = new Set([...byRank.entries()].filter(([r, n]) => !isJokerRank(r) && r !== levelRank && n === 3 && wilds >= 1 && singleStrength(r, levelRank) >= singleStrength("Q", levelRank)).map(([r]) => r));
+      const tch = (m) => (m.cards || []).some((c) => bombR.has(c.rank));
+      if (bombR.size && tch(move) && (allMoves || []).some((m) => !isPass(m) && !isBombLike(m.combo) && !tch(m) && !usesWild(m, levelRank))) {
+        score -= R7("GD_R20_KB", 70);
+        tags.push("r20KeepBomb");
+      }
     }
     const r14h = r14Hot(ctx);
     if (r14h && r14Mode() & 1 && isPass(move) && (allMoves || []).some((m) => !isPass(m) && !isBombLike(m.combo))) {
@@ -2060,7 +2100,7 @@
     }
     const earlyMidFollow = !ctx.leading && !!ctx.previous && !partner && !toBeatPartner && enemyShort >= 6 && hand.length >= 10 && (ctx.previous.type === TYPES.SINGLE || ctx.previous.type === TYPES.PAIR);
     const followCost = (m) => earlyFollowCost(m, ctx.previous, hand, levelRank);
-    if (!ctx.leading && !toBeatPartner && !isPass(move) && (((_E = move.combo) == null ? void 0 : _E.type) === TYPES.SINGLE || ((_F = move.combo) == null ? void 0 : _F.type) === TYPES.PAIR) && ((_G = ctx.previous) == null ? void 0 : _G.type) === move.combo.type) {
+    if (!ctx.leading && !toBeatPartner && !isPass(move) && (((_G = move.combo) == null ? void 0 : _G.type) === TYPES.SINGLE || ((_H = move.combo) == null ? void 0 : _H.type) === TYPES.PAIR) && ((_I = ctx.previous) == null ? void 0 : _I.type) === move.combo.type) {
       const st = cappedStrength(move.combo.rank);
       if (enemyShort <= 2) score += st * 3;
       else score += (15 - st) * 2;
@@ -2084,9 +2124,9 @@
       }
       tags.push("followSize");
     }
-    if (!ctx.leading && enemyShort >= 4 && ((_H = move.combo) == null ? void 0 : _H.type) === TYPES.SINGLE && (move.combo.rank === levelRank || move.combo.rank === "BJ" || move.combo.rank === "RJ") && !emptiesHand(move, ctx.hand) && !winThenGood) {
+    if (!ctx.leading && enemyShort >= 4 && ((_J = move.combo) == null ? void 0 : _J.type) === TYPES.SINGLE && (move.combo.rank === levelRank || move.combo.rank === "BJ" || move.combo.rank === "RJ") && !emptiesHand(move, ctx.hand) && !winThenGood) {
       const tempo = hand.length <= 12 || partnerCountS <= 7;
-      const bigPrev = ((_I = ctx.previous) == null ? void 0 : _I.type) === TYPES.SINGLE && singleStrength(ctx.previous.rank, levelRank) >= singleStrength("J", levelRank);
+      const bigPrev = ((_K = ctx.previous) == null ? void 0 : _K.type) === TYPES.SINGLE && singleStrength(ctx.previous.rank, levelRank) >= singleStrength("J", levelRank);
       score -= tempo ? bigPrev ? 15 : 45 : 80;
       tags.push(tempo ? "keepControlSoft" : "keepControl");
     }
@@ -2094,7 +2134,7 @@
       score += winThenGood ? 40 : 20;
       tags.push("tempoTake");
     }
-    if (R7("R7_CT", 1) && !ctx.leading && ctx.previous && !partner && !toBeatPartner && !isPass(move) && !emptiesHand(move, ctx.hand) && hand.length <= 12 && enemyShort >= 3 && (((_J = move.combo) == null ? void 0 : _J.type) === TYPES.SINGLE || ((_K = move.combo) == null ? void 0 : _K.type) === TYPES.PAIR) && ctx.previous.type === move.combo.type && (move.combo.rank === levelRank || isJokerRank(move.combo.rank)) && !usesWild(move, levelRank) && enemyShort <= R7("R7_CTE", 13) && // 只奖励“最便宜够用”的控制牌：有更小的级牌/王同型能压就不加（例 dev-r6 R146、dev-real d001）
+    if (R7("R7_CT", 1) && !ctx.leading && ctx.previous && !partner && !toBeatPartner && !isPass(move) && !emptiesHand(move, ctx.hand) && hand.length <= 12 && enemyShort >= 3 && (((_L = move.combo) == null ? void 0 : _L.type) === TYPES.SINGLE || ((_M = move.combo) == null ? void 0 : _M.type) === TYPES.PAIR) && ctx.previous.type === move.combo.type && (move.combo.rank === levelRank || isJokerRank(move.combo.rank)) && !usesWild(move, levelRank) && enemyShort <= R7("R7_CTE", 13) && // 只奖励“最便宜够用”的控制牌：有更小的级牌/王同型能压就不加（例 dev-r6 R146、dev-real d001）
     !(R7("R7_CTC", 1) && (allMoves || []).some((m) => {
       var _a2;
       return !isPass(m) && ((_a2 = m.combo) == null ? void 0 : _a2.type) === move.combo.type && !isBombLike(m.combo) && (m.combo.rank === levelRank || isJokerRank(m.combo.rank)) && !usesWild(m, levelRank) && singleStrength(m.combo.rank, levelRank) < singleStrength(move.combo.rank, levelRank);
@@ -2109,9 +2149,13 @@
         }
       }
     }
-    if (!ctx.leading && enemyShort >= 4 && ((_L = move.combo) == null ? void 0 : _L.type) === TYPES.PAIR && (move.combo.rank === levelRank || isJokerRank(move.combo.rank)) && !emptiesHand(move, ctx.hand) && !winThenGood) {
+    if (!ctx.leading && enemyShort >= 4 && ((_N = move.combo) == null ? void 0 : _N.type) === TYPES.PAIR && (move.combo.rank === levelRank || isJokerRank(move.combo.rank)) && !emptiesHand(move, ctx.hand) && !winThenGood) {
       score -= 80;
       tags.push("keepControlPair");
+    }
+    if (r20Mode() & 16 && earlyMidFollow && !isPass(move) && ((_O = move.combo) == null ? void 0 : _O.type) === TYPES.SINGLE && ctx.previous.type === TYPES.SINGLE && ["K", "A"].includes(move.combo.rank) && move.combo.rank !== levelRank && (byRank.get(move.combo.rank) || 0) <= 2 && !usesWild(move, levelRank) && singleStrength(ctx.previous.rank, levelRank) <= singleStrength("9", levelRank)) {
+      score += R7("GD_R20_BLK", 12);
+      tags.push("r20BlockNext");
     }
     if (earlyMidFollow) {
       const smallPrev = singleStrength(ctx.previous.rank, levelRank) <= singleStrength("10", levelRank) && ctx.previous.rank !== levelRank;
@@ -2140,7 +2184,7 @@
         tags.push("passiveEarly");
       }
     }
-    if (!ctx.leading && !isPass(move) && ((_M = move.combo) == null ? void 0 : _M.type) === TYPES.SINGLE && ((_N = ctx.previous) == null ? void 0 : _N.type) === TYPES.SINGLE && !emptiesHand(move, ctx.hand)) {
+    if (!ctx.leading && !isPass(move) && ((_P = move.combo) == null ? void 0 : _P.type) === TYPES.SINGLE && ((_Q = ctx.previous) == null ? void 0 : _Q.type) === TYPES.SINGLE && !emptiesHand(move, ctx.hand)) {
       const restN = minPlays(restAfter(hand, move), levelRank);
       if (restN <= 1) {
         score += 40 * winProb(move, ctx);
@@ -2158,7 +2202,7 @@
           tags.push("keepFinish");
         }
       }
-      if ((enemyShort >= 4 || enemyShort >= 3 && (((_O = move.cards) == null ? void 0 : _O.length) || 0) >= 3) && usesWild(move, levelRank) && !winThenGood) {
+      if ((enemyShort >= 4 || enemyShort >= 3 && (((_R = move.cards) == null ? void 0 : _R.length) || 0) >= 3) && usesWild(move, levelRank) && !winThenGood) {
         score -= 100;
         tags.push("keepWild");
       } else if (enemyShort >= 2 && wildFillers(move, levelRank) > 0) {
@@ -2177,7 +2221,7 @@
       if (usesWild(move, levelRank)) {
         score -= 60;
         tags.push("leadNoWild");
-      } else if (((_P = move.combo) == null ? void 0 : _P.type) === TYPES.FULLHOUSE && move.combo.rank === levelRank) {
+      } else if (((_S = move.combo) == null ? void 0 : _S.type) === TYPES.FULLHOUSE && move.combo.rank === levelRank) {
         score -= 30;
         tags.push("leadNoLevelTriple");
       }
@@ -2190,25 +2234,25 @@
         }
       );
       const hasOrphan = [...byRank.values()].some((n) => n === 1);
-      const nextEnemyN = (_R = seatCounts[(((_Q = ctx.seat) != null ? _Q : 0) + 1) % 4]) != null ? _R : 27;
+      const nextEnemyN = (_U = seatCounts[(((_T = ctx.seat) != null ? _T : 0) + 1) % 4]) != null ? _U : 27;
       void nextEnemyN;
       const feedOk1 = partnerCount === 1 && !enemyCutsBeforePartner(ctx, 1);
       const feedPairAvail = partnerCount === 2 && enemyShort >= 3 && (allMoves || []).some((m) => {
         var _a2;
         return ((_a2 = m.combo) == null ? void 0 : _a2.type) === TYPES.PAIR && [2, 3].includes(byRank.get(m.combo.rank) || 0) && !usesWild(m, levelRank) && singleStrength(m.combo.rank, levelRank) <= 10;
       });
-      if (feedOk1 && ((_S = move.combo) == null ? void 0 : _S.type) === TYPES.SINGLE) {
+      if (feedOk1 && ((_V = move.combo) == null ? void 0 : _V.type) === TYPES.SINGLE) {
         const lowOrphans = [...byRank.entries()].filter(([r, n]) => n === 1 && singleStrength(r, levelRank) <= 8);
         const isOrphan = isOrphanSingleMove(move, byRank);
         score += 260 - cappedStrength(move.combo.rank) * 6;
         if (lowOrphans.length && !isOrphan) score -= 120;
         tags.push("feedPartner");
       }
-      if (feedPairAvail && ((_T = move.combo) == null ? void 0 : _T.type) === TYPES.PAIR && [2, 3].includes(byRank.get(move.combo.rank) || 0) && !usesWild(move, levelRank)) {
+      if (feedPairAvail && ((_W = move.combo) == null ? void 0 : _W.type) === TYPES.PAIR && [2, 3].includes(byRank.get(move.combo.rank) || 0) && !usesWild(move, levelRank)) {
         score += 150 - cappedStrength(move.combo.rank) * 5 - ((byRank.get(move.combo.rank) || 0) === 3 ? 35 : 0) + 40;
         tags.push("feedPartnerPair");
       }
-      if (hand.length === 2 && partnerCount !== 1 && ((_U = move.combo) == null ? void 0 : _U.type) === TYPES.SINGLE && !(allMoves || []).some((m) => emptiesHand(m, ctx.hand))) {
+      if (hand.length === 2 && partnerCount !== 1 && ((_X = move.combo) == null ? void 0 : _X.type) === TYPES.SINGLE && !(allMoves || []).some((m) => emptiesHand(m, ctx.hand))) {
         const other = hand.find((c) => !move.cards.some((x) => x.id === c.id));
         if (other && singleStrength(move.combo.rank, levelRank) > singleStrength(other.rank, levelRank)) {
           score += 200;
@@ -2216,14 +2260,14 @@
         }
       }
       if (enemyShort === 2 && partnerCount > 2 && !(allMoves || []).some((m) => emptiesHand(m, ctx.hand))) {
-        if (((_V = move.combo) == null ? void 0 : _V.type) === TYPES.PAIR) score -= 70;
-        if (((_W = move.combo) == null ? void 0 : _W.type) === TYPES.SINGLE && isOrphanSingleMove(move, byRank) && !(allMoves || []).some((m) => {
+        if (((_Y = move.combo) == null ? void 0 : _Y.type) === TYPES.PAIR) score -= 70;
+        if (((_Z = move.combo) == null ? void 0 : _Z.type) === TYPES.SINGLE && isOrphanSingleMove(move, byRank) && !(allMoves || []).some((m) => {
           var _a2;
           return !isBombLike(m.combo) && (((_a2 = m.cards) == null ? void 0 : _a2.length) || 0) >= 3;
         })) score += 30;
         tags.push("vsTwoNoPair");
       }
-      if (enemyShort === 2 && partnerCount !== 1 && !isBombLike(move.combo) && (((_X = move.cards) == null ? void 0 : _X.length) || 0) >= 3 && !(allMoves || []).some((m) => emptiesHand(m, ctx.hand))) {
+      if (enemyShort === 2 && partnerCount !== 1 && !isBombLike(move.combo) && (((__ = move.cards) == null ? void 0 : __.length) || 0) >= 3 && !(allMoves || []).some((m) => emptiesHand(m, ctx.hand))) {
         score += 90;
         tags.push("unfollowableVsTwo");
       }
@@ -2231,14 +2275,14 @@
         score += 60 + (14 - singleStrength(move.combo.rank, levelRank)) * 3;
         tags.push("smallFirst");
       }
-      if (enemyShort <= 1 && !feedOk1 && !poolNonSingle && ((_Y = move.combo) == null ? void 0 : _Y.type) === TYPES.SINGLE) {
+      if (enemyShort <= 1 && !feedOk1 && !poolNonSingle && ((_$ = move.combo) == null ? void 0 : _$.type) === TYPES.SINGLE) {
         score += cappedStrength(move.combo.rank) * 12 + 55;
         if (isControlRank(move.combo.rank, levelRank)) score += 55;
         tags.push("bigFirstVsLast");
       }
       if (enemyShort === 2 && !hasOrphan && partnerCount !== 1) {
-        if (((_Z = move.combo) == null ? void 0 : _Z.type) === TYPES.SINGLE) score += 120;
-        if (((__ = move.combo) == null ? void 0 : __.type) === TYPES.PAIR) score -= 60;
+        if (((_aa = move.combo) == null ? void 0 : _aa.type) === TYPES.SINGLE) score += 120;
+        if (((_ba = move.combo) == null ? void 0 : _ba.type) === TYPES.PAIR) score -= 60;
         tags.push("vsTwoSingle");
       }
     }
@@ -2259,7 +2303,7 @@
     if (!isPass(move) && !emptiesHand(move, ctx.hand)) {
       let fin = moveFinish(move, ctx, laCache(ctx));
       if (fin && ctx.leading && isBombLike(move.combo) && enemyShort >= 6) fin = null;
-      const pc1 = (ctx.remainingSeatCounts || [])[(((_$ = ctx.seat) != null ? _$ : 0) + 2) % 4];
+      const pc1 = (ctx.remainingSeatCounts || [])[(((_ca = ctx.seat) != null ? _ca : 0) + 2) % 4];
       if (fin === "likely" && ctx.leading && pc1 === 1) fin = null;
       if (fin) {
         score += fin === "sure" ? 160 : fin === "bombBack" ? 115 : 100;
@@ -2277,9 +2321,9 @@
       }
     }
     if (!ctx.leading && ctx.previous && isPass(move) && partner) {
-      const seatP = (_aa = ctx.seat) != null ? _aa : 0;
+      const seatP = (_da = ctx.seat) != null ? _da : 0;
       const cP = ctx.remainingSeatCounts || [];
-      const sizeP = ((_ca = (_ba = ctx.previous) == null ? void 0 : _ba.cards) == null ? void 0 : _ca.length) || ((_da = ctx.previous) == null ? void 0 : _da.size) || 1;
+      const sizeP = ((_fa = (_ea = ctx.previous) == null ? void 0 : _ea.cards) == null ? void 0 : _fa.length) || ((_ga = ctx.previous) == null ? void 0 : _ga.size) || 1;
       const nextE = cP[(seatP + 1) % 4];
       const hasBlock = (allMoves || []).some((m) => !isPass(m) && !isBombLike(m.combo));
       if (nextE > 0 && nextE === sizeP && hasBlock) {
@@ -2299,7 +2343,7 @@
           const wildM = usesWild(move, levelRank);
           let k = 1;
           if (partner) {
-            const sizeP = ((_fa = (_ea = ctx.previous) == null ? void 0 : _ea.cards) == null ? void 0 : _fa.length) || ((_ga = ctx.previous) == null ? void 0 : _ga.size) || 1;
+            const sizeP = ((_ia = (_ha = ctx.previous) == null ? void 0 : _ha.cards) == null ? void 0 : _ia.length) || ((_ja = ctx.previous) == null ? void 0 : _ja.size) || 1;
             const pw = winProb({ combo: ctx.previous, cards: new Array(sizeP).fill(null) }, ctx);
             k = Math.max(0, Math.min(1, (1 - pw) / 0.5));
           }
@@ -3044,7 +3088,7 @@
     const rec = decide(ctxFor(g, seat));
     return { move: rec.move, reason: rec.reason || "", text: moveText(rec.move), scored: rec.scored || [], lv: g.match.levelRank };
   }
-  var COACH_GAP_MIN = 12;
+  var COACH_GAP_MIN = 6;
   var eqKey = (m, lv) => isPassMove(m) ? "pass" : `${m.combo.type}:${m.combo.rank}:${m.cards.map((c) => isWildCard(c, lv) ? "*" : c.rank).sort().join(",")}`;
   function moveGap(coach, move) {
     const sc = (coach == null ? void 0 : coach.scored) || [];
@@ -3058,7 +3102,9 @@
   function coachDiffInfo(coach, move) {
     if (moveKey(coach.move) === moveKey(move)) return {};
     const gap = moveGap(coach, move);
-    return { gap: gap == null ? null : Math.round(gap * 10) / 10, minor: gap != null && gap < COACH_GAP_MIN };
+    const kind = (m) => isPassMove(m) ? "pass" : isBombLike(m.combo) ? "bomb" : "play";
+    const sameKind = kind(coach.move) === kind(move);
+    return { gap: gap == null ? null : Math.round(gap * 10) / 10, minor: sameKind && gap != null && gap < COACH_GAP_MIN };
   }
   function snapshot(g, seat) {
     var _a, _b;
