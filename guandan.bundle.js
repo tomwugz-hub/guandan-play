@@ -2546,6 +2546,11 @@
     const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a.GD_R28 : void 0;
     return v == null ? 4 : Number(v) || 0;
   };
+  var r30Mode = () => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a.GD_R30 : void 0;
+    return v == null ? 1 : Number(v) || 0;
+  };
   var R29 = (k, d) => {
     var _a;
     const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a["GD_R29X_" + k] : void 0;
@@ -3028,9 +3033,13 @@
         const top = ranked[0];
         const ok = (r) => {
           var _a2;
-          return !isPass(r.move) && !(R7("NS", 0) && ((_a2 = r.move.combo) == null ? void 0 : _a2.type) === TYPES.SINGLE) && !isBombLike(r.move.combo) && r.score > -1e5 && r.score >= top.score - R29("M4", R7("M4", 100)) && !(r.move.cards || []).some((c) => isWildCard(c, lvR) || isJokerRank(c.rank) || (cntN.get(c.rank) || 0) >= 4);
+          return !isPass(r.move) && !(R7("NS", 0) && ((_a2 = r.move.combo) == null ? void 0 : _a2.type) === TYPES.SINGLE) && !isBombLike(r.move.combo) && r.score > -1e5 && r.score >= top.score - R29("M4", R7("M4", 100)) && !(r.move.cards || []).some((c) => isWildCard(c, lvR) && !(r30Mode() & 4) || isJokerRank(c.rank) && !(r30Mode() & 9) || (cntN.get(c.rank) || 0) >= 4 && !(r30Mode() & 2));
         };
-        const alts = ranked.filter(ok);
+        let alts = ranked.filter(ok);
+        if (r30Mode() & 8) {
+          const nj = alts.filter((r) => !(r.move.cards || []).some((c) => isJokerRank(c.rank)));
+          if (nj.length) alts = nj;
+        }
         if (alts.length) {
           const pick = alts[0];
           pick.score = top.score + 1;
