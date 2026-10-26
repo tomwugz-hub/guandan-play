@@ -2546,6 +2546,11 @@
     const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a.GD_R28 : void 0;
     return v == null ? 4 : Number(v) || 0;
   };
+  var R29 = (k, d) => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a["GD_R29X_" + k] : void 0;
+    return v == null ? d : Number(v);
+  };
   var R7 = (k, d) => {
     var _a, _b, _c, _d, _e;
     const v = typeof process !== "undefined" ? (_e = (_c = (_a = process.env) == null ? void 0 : _a["GD_R29_" + k]) != null ? _c : (_b = process.env) == null ? void 0 : _b["R28_" + k]) != null ? _e : (_d = process.env) == null ? void 0 : _d[k] : void 0;
@@ -3017,13 +3022,13 @@
     if (r28Mode() & 4 && !full.leading && full.previous && isPass((_L = ranked[0]) == null ? void 0 : _L.move)) {
       const me = (_M = full.seat) != null ? _M : 0;
       const lvR = full.levelRank || "2";
-      if (full.lastPlaySeat != null && full.lastPlaySeat % 2 !== me % 2 && (full.hand || []).length >= 10 && (full.hand || []).length <= 22) {
+      if (full.lastPlaySeat != null && full.lastPlaySeat % 2 !== me % 2 && (full.hand || []).length >= R29("LO", 1) && (full.hand || []).length <= R29("HI", 22)) {
         const cntN = /* @__PURE__ */ new Map();
         for (const c of full.hand || []) if (!isWildCard(c, lvR) && !isJokerRank(c.rank)) cntN.set(c.rank, (cntN.get(c.rank) || 0) + 1);
         const top = ranked[0];
         const ok = (r) => {
           var _a2;
-          return !isPass(r.move) && !(R7("NS", 0) && ((_a2 = r.move.combo) == null ? void 0 : _a2.type) === TYPES.SINGLE) && !isBombLike(r.move.combo) && r.score > -1e5 && r.score >= top.score - R7("M4", 100) && !(r.move.cards || []).some((c) => isWildCard(c, lvR) || isJokerRank(c.rank) || (cntN.get(c.rank) || 0) >= 4);
+          return !isPass(r.move) && !(R7("NS", 0) && ((_a2 = r.move.combo) == null ? void 0 : _a2.type) === TYPES.SINGLE) && !isBombLike(r.move.combo) && r.score > -1e5 && r.score >= top.score - R29("M4", R7("M4", 100)) && !(r.move.cards || []).some((c) => isWildCard(c, lvR) || isJokerRank(c.rank) || (cntN.get(c.rank) || 0) >= 4);
         };
         const alts = ranked.filter(ok);
         if (alts.length) {
