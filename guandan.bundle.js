@@ -1045,7 +1045,7 @@
     return res;
   }
   function moveFinish(move, ctx, cache) {
-    var _a;
+    var _a, _b;
     if (!((_a = move == null ? void 0 : move.cards) == null ? void 0 : _a.length)) return null;
     const hand = ctx.hand || [];
     const rest = restAfter(hand, move);
@@ -1067,7 +1067,8 @@
     }
     const s = safety(move, ctx);
     if (!s) return null;
-    const r = finishLine(rest, ctx, rest.length <= 8 ? 2 : 1, cache);
+    const m44 = typeof process !== "undefined" ? Number(((_b = process.env) == null ? void 0 : _b.GD_R44) || 0) : 0;
+    const r = finishLine(rest, ctx, m44 & 4 ? rest.length <= 8 ? 3 : 2 : rest.length <= 8 ? 2 : 1, cache);
     return worse(s, r);
   }
   function feedAfter(move, ctx) {
@@ -1852,7 +1853,7 @@
     return partner.type === prev.type && ((_a = partner.rank) != null ? _a : null) === ((_b = prev.rank) != null ? _b : null);
   }
   function scoreMove(move, ctx, allMoves) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja, _ka;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja, _ka, _la, _ma, _na, _oa, _pa;
     const tags = [];
     if (isForbidden(move, ctx, allMoves)) return { score: -1e6, tags: ["forbidden"] };
     const struct = ctx._struct || detectStructures(ctx.hand || [], ctx.levelRank);
@@ -2336,7 +2337,11 @@
       } else if (!ctx.leading && ctx.previous && !resolvePartnerCombo(ctx)) {
         const feed = feedAfter(move, ctx);
         const bombOk = !isBombLike(move.combo) || enemyShort <= 3;
-        if (feed && bombOk) {
+        const m35v = typeof process !== "undefined" ? (_ea = process.env) == null ? void 0 : _ea.GD_R35 : void 0;
+        const m35f = m35v == null ? 0 : Number(m35v) || 0;
+        const nx35 = (_ga = (ctx.remainingSeatCounts || [])[(((_fa = ctx.seat) != null ? _fa : 0) + 1) % 4]) != null ? _ga : 27;
+        const r35Skip = !!(m35f & 2) && isBombLike(move.combo) && nx35 <= Number((_ia = (_ha = process.env) == null ? void 0 : _ha.GD_R35X_N) != null ? _ia : 2);
+        if (feed && bombOk && !r35Skip) {
           const p = winProb(move, ctx);
           if (p >= 0.3) {
             score += Math.round(70 * p) - (isBombLike(move.combo) ? 20 : 0);
@@ -2346,9 +2351,9 @@
       }
     }
     if (!ctx.leading && ctx.previous && isPass(move) && partner) {
-      const seatP = (_ea = ctx.seat) != null ? _ea : 0;
+      const seatP = (_ja = ctx.seat) != null ? _ja : 0;
       const cP = ctx.remainingSeatCounts || [];
-      const sizeP = ((_ga = (_fa = ctx.previous) == null ? void 0 : _fa.cards) == null ? void 0 : _ga.length) || ((_ha = ctx.previous) == null ? void 0 : _ha.size) || 1;
+      const sizeP = ((_la = (_ka = ctx.previous) == null ? void 0 : _ka.cards) == null ? void 0 : _la.length) || ((_ma = ctx.previous) == null ? void 0 : _ma.size) || 1;
       const nextE = cP[(seatP + 1) % 4];
       const hasBlock = (allMoves || []).some((m) => !isPass(m) && !isBombLike(m.combo));
       if (nextE > 0 && nextE === sizeP && hasBlock) {
@@ -2368,7 +2373,7 @@
           const wildM = usesWild(move, levelRank);
           let k = 1;
           if (partner) {
-            const sizeP = ((_ja = (_ia = ctx.previous) == null ? void 0 : _ia.cards) == null ? void 0 : _ja.length) || ((_ka = ctx.previous) == null ? void 0 : _ka.size) || 1;
+            const sizeP = ((_oa = (_na = ctx.previous) == null ? void 0 : _na.cards) == null ? void 0 : _oa.length) || ((_pa = ctx.previous) == null ? void 0 : _pa.size) || 1;
             const pw = winProb({ combo: ctx.previous, cards: new Array(sizeP).fill(null) }, ctx);
             k = Math.max(0, Math.min(1, (1 - pw) / 0.5));
           }
@@ -2551,6 +2556,56 @@
     const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a.GD_R30 : void 0;
     return v == null ? 1 : Number(v) || 0;
   };
+  var r43Mode = () => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a.GD_R43 : void 0;
+    return v == null ? 0 : Number(v) || 0;
+  };
+  var r44Mode = () => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a.GD_R44 : void 0;
+    return v == null ? 0 : Number(v) || 0;
+  };
+  var R44 = (k, d) => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a["GD_R44X_" + k] : void 0;
+    return v == null ? d : Number(v);
+  };
+  var R43 = (k, d) => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a["GD_R43X_" + k] : void 0;
+    return v == null ? d : Number(v);
+  };
+  var r31Mode = () => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a.GD_R31 : void 0;
+    return v == null ? 0 : Number(v) || 0;
+  };
+  var r32Mode = () => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a.GD_R32 : void 0;
+    return v == null ? 0 : Number(v) || 0;
+  };
+  var r34Mode = () => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a.GD_R34 : void 0;
+    return v == null ? 0 : Number(v) || 0;
+  };
+  var R34 = (k, d) => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a["GD_R34X_" + k] : void 0;
+    return v == null ? d : Number(v);
+  };
+  var R32 = (k, d) => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a["GD_R32X_" + k] : void 0;
+    return v == null ? d : Number(v);
+  };
+  var R31 = (k, d) => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a["GD_R31X_" + k] : void 0;
+    return v == null ? d : Number(v);
+  };
   var R29 = (k, d) => {
     var _a;
     const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a["GD_R29X_" + k] : void 0;
@@ -2594,7 +2649,8 @@
       const delta = Math.max(0, rp.cost + moveCost - plan.cost);
       const feedMove = partnerCount === 1 && ((_a = move.combo) == null ? void 0 : _a.type) === TYPES.SINGLE || partnerCount === 2 && ((_b = move.combo) == null ? void 0 : _b.type) === TYPES.PAIR;
       if (delta > 0.04 && !feedMove) {
-        score -= Math.min(90, 45 * delta);
+        const m43 = r43Mode();
+        score -= m43 & 1 ? Math.min(R43("CAP", 140), R43("K", 70) * delta) : Math.min(90, 45 * delta);
         tags.push("offPlan");
       }
     }
@@ -2621,7 +2677,7 @@
       });
       const first = longU.length ? longU[0] : weak[0];
       if (first.key === comboKey(move)) {
-        score += longU.length ? big ? R7("R7_UNIT", 100) : 100 : big ? R7("R7_WEAK", 45) : 45;
+        score += longU.length ? big ? R7("R7_UNIT", 100) : 100 : r43Mode() & 2 ? R43("W", 80) : big ? R7("R7_WEAK", 45) : 45;
         tags.push(longU.length ? "planUnitFirst" : "planWeakFirst");
       } else if (((_c = comps.find((c) => c.key === comboKey(move))) == null ? void 0 : _c.role) === "control" && weak.length >= 1) {
         score -= 20;
@@ -2666,7 +2722,7 @@
     return { score, tags };
   }
   function decide(ctx = {}) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja, _ka, _la, _ma, _na, _oa, _pa, _qa, _ra, _sa, _ta, _ua, _va, _wa, _xa, _ya, _za, _Aa, _Ba, _Ca, _Da, _Ea, _Fa, _Ga, _Ha, _Ia, _Ja, _Ka, _La, _Ma, _Na, _Oa, _Pa, _Qa, _Ra, _Sa, _Ta, _Ua;
     const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
     const belief = ctx.belief || buildBelief(ctx);
     const full = { ...ctx, belief };
@@ -2721,7 +2777,9 @@
         ms: (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0
       };
     }
-    const beam = beamSearch(full, { beam: 10, timeMs: 20 });
+    const m44 = r44Mode();
+    const beamW = m44 & 1 ? 0 : m44 & 2 ? R44("W", 0.15) : 0.05;
+    const beam = beamW ? beamSearch(full, { beam: 10, timeMs: 20 }) : [];
     let pool = uniqueByCards(cands);
     const allowed = pool.filter((m) => !isForbidden(m, full, pool));
     const filteredOut = allowed.length ? pool.filter((m) => !allowed.includes(m)) : [];
@@ -2733,7 +2791,7 @@
     for (const m of pool) {
       const { score, tags } = scoreMove(m, full, pool);
       const extra = beam.find((b) => sameMove(b.move, m));
-      const s = score + (extra ? extra.value * 0.05 : 0);
+      const s = score + (extra ? extra.value * beamW : 0);
       ranked.push({ move: m, score: s, tags });
       if (s > bestS) {
         bestS = s;
@@ -3027,18 +3085,57 @@
     if (r28Mode() & 4 && !full.leading && full.previous && isPass((_L = ranked[0]) == null ? void 0 : _L.move)) {
       const me = (_M = full.seat) != null ? _M : 0;
       const lvR = full.levelRank || "2";
-      if (full.lastPlaySeat != null && full.lastPlaySeat % 2 !== me % 2 && (full.hand || []).length >= R29("LO", 1) && (full.hand || []).length <= R29("HI", 22)) {
+      const v37 = typeof process !== "undefined" ? (_N = process.env) == null ? void 0 : _N.GD_R37 : void 0;
+      const m37 = v37 == null ? 0 : Number(v37) || 0;
+      const X37 = (k, d) => {
+        var _a2;
+        const e = typeof process !== "undefined" ? (_a2 = process.env) == null ? void 0 : _a2["GD_R37X_" + k] : void 0;
+        return e == null ? d : Number(e);
+      };
+      const hl = (full.hand || []).length;
+      const encLeft = full.lastPlaySeat != null ? (_O = (full.remainingSeatCounts || [])[full.lastPlaySeat]) != null ? _O : 27 : 27;
+      const late37 = m37 & 2 && encLeft > 0 && encLeft <= X37("EL", 6);
+      const big37 = m37 & 4 && hl > R29("HI", 22);
+      const v38 = typeof process !== "undefined" ? (_P = process.env) == null ? void 0 : _P.GD_R38 : void 0;
+      const m38 = v38 == null ? 0 : Number(v38) || 0;
+      const X38 = (k, d) => {
+        var _a2;
+        const e = typeof process !== "undefined" ? (_a2 = process.env) == null ? void 0 : _a2["GD_R38X_" + k] : void 0;
+        return e == null ? d : Number(e);
+      };
+      const big38 = m38 !== 0 && !big37 && hl > R29("HI", 22) && (!(m38 & 2) || hl >= X38("HB", 24));
+      const ok38 = (r) => {
+        var _a2, _b2, _c2;
+        return !big38 || late37 || hl >= R29("LO", 1) && hl <= R29("HI", 22) || ((_a2 = r.move.combo) == null ? void 0 : _a2.type) !== TYPES.SINGLE && (!(m38 & 1) || ((_b2 = r.move.combo) == null ? void 0 : _b2.type) === TYPES.PAIR || ((_c2 = r.move.combo) == null ? void 0 : _c2.type) === TYPES.TRIPLE) && (!(m38 & 4) || r.score >= ranked[0].score - X38("M", 60));
+      };
+      if (full.lastPlaySeat != null && full.lastPlaySeat % 2 !== me % 2 && (hl >= R29("LO", 1) && hl <= R29("HI", 22) || late37 || big37 || big38)) {
         const cntN = /* @__PURE__ */ new Map();
         for (const c of full.hand || []) if (!isWildCard(c, lvR) && !isJokerRank(c.rank)) cntN.set(c.rank, (cntN.get(c.rank) || 0) + 1);
         const top = ranked[0];
         const ok = (r) => {
-          var _a2;
-          return !isPass(r.move) && !(R7("NS", 0) && ((_a2 = r.move.combo) == null ? void 0 : _a2.type) === TYPES.SINGLE) && !isBombLike(r.move.combo) && r.score > -1e5 && r.score >= top.score - R29("M4", R7("M4", 100)) && !(r.move.cards || []).some((c) => isWildCard(c, lvR) && !(r30Mode() & 4) || isJokerRank(c.rank) && !(r30Mode() & 9) || (cntN.get(c.rank) || 0) >= 4 && !(r30Mode() & 2));
+          var _a2, _b2, _c2;
+          return !isPass(r.move) && !(R7("NS", 0) && ((_a2 = r.move.combo) == null ? void 0 : _a2.type) === TYPES.SINGLE) && !isBombLike(r.move.combo) && r.score > -1e5 && r.score >= top.score - (late37 ? X37("ML", 250) : ((_b2 = r.move.combo) == null ? void 0 : _b2.type) !== TYPES.SINGLE && m37 & 1 ? X37("M4N", 200) : R29("M4", R7("M4", 100))) && !(big37 && !late37 && hl > R29("HI", 22) && ((_c2 = r.move.combo) == null ? void 0 : _c2.type) === TYPES.SINGLE) && !(r.move.cards || []).some((c) => isWildCard(c, lvR) && !(r30Mode() & 4) || isJokerRank(c.rank) && !(r30Mode() & 9) || (cntN.get(c.rank) || 0) >= 4 && !(r30Mode() & 2));
         };
-        let alts = ranked.filter(ok);
+        let alts = ranked.filter((r) => ok(r) && ok38(r));
         if (r30Mode() & 8) {
           const nj = alts.filter((r) => !(r.move.cards || []).some((c) => isJokerRank(c.rank)));
           if (nj.length) alts = nj;
+        }
+        {
+          const v36 = typeof process !== "undefined" ? (_Q = process.env) == null ? void 0 : _Q.GD_R36 : void 0;
+          const m36 = v36 == null ? 0 : Number(v36) || 0;
+          if (alts.length > 1 && m36 & 2) {
+            const nc = alts.filter((r) => !(r.move.cards || []).some((c) => isControlRank(c.rank, lvR)));
+            if (nc.length) alts = nc;
+          }
+          if (alts.length > 1 && m36 & 1) {
+            const st = (r) => {
+              var _a2;
+              return ((_a2 = r.move.combo) == null ? void 0 : _a2.rank) != null ? singleStrength(r.move.combo.rank, lvR) : 99;
+            };
+            const mn = Math.min(...alts.map(st));
+            alts = alts.filter((r) => st(r) === mn);
+          }
         }
         if (alts.length) {
           const pick = alts[0];
@@ -3051,8 +3148,348 @@
         }
       }
     }
-    if (r28Mode() & 8 && !full.leading && ((_N = full.previous) == null ? void 0 : _N.type) === TYPES.SINGLE && ((_Q = (_P = (_O = ranked[0]) == null ? void 0 : _O.move) == null ? void 0 : _P.combo) == null ? void 0 : _Q.type) === TYPES.SINGLE && isJokerRank((_S = (_R = ranked[0].move.cards) == null ? void 0 : _R[0]) == null ? void 0 : _S.rank)) {
-      const me = (_T = full.seat) != null ? _T : 0;
+    {
+      const v = typeof process !== "undefined" ? (_R = process.env) == null ? void 0 : _R.GD_R39 : void 0;
+      const m39 = v == null ? 0 : Number(v) || 0;
+      const X = (k, d) => {
+        var _a2;
+        const e = typeof process !== "undefined" ? (_a2 = process.env) == null ? void 0 : _a2["GD_R39X_" + k] : void 0;
+        return e == null ? d : Number(e);
+      };
+      const me = (_S = full.seat) != null ? _S : 0;
+      const rc = full.remainingSeatCounts || [];
+      const lvR = full.levelRank || "2";
+      if (m39 & 1 && !full.leading && full.previous && isPass((_T = ranked[0]) == null ? void 0 : _T.move) && full.lastPlaySeat === (me + 2) % 4 && !isBombLike(full.previous) && ((_U = rc[(me + 1) % 4]) != null ? _U : 27) <= X("EN", 4) && ((_V = rc[(me + 1) % 4]) != null ? _V : 27) > 0 && ((_W = rc[(me + 2) % 4]) != null ? _W : 0) > X("PN", 4) && (full.previous.rank == null || singleStrength(full.previous.rank, lvR) <= singleStrength(X("QR", 10) >= 12 ? "Q" : "10", lvR))) {
+        const top = ranked[0];
+        const alt = ranked.find((r) => !isPass(r.move) && !isBombLike(r.move.combo) && r.score > -1e5 && r.score >= top.score - X("M", 100));
+        if (alt) {
+          alt.score = top.score + 1;
+          alt.tags = alt.tags.concat("r39TopPartner");
+          ranked.sort((a, b) => b.score - a.score);
+          best = alt.move;
+          bestTags = alt.tags;
+          bestS = alt.score;
+        }
+      }
+    }
+    {
+      const v = typeof process !== "undefined" ? (_X = process.env) == null ? void 0 : _X.GD_R40 : void 0;
+      const m40 = v == null ? 0 : Number(v) || 0;
+      const X = (k, d) => {
+        var _a2;
+        const e = typeof process !== "undefined" ? (_a2 = process.env) == null ? void 0 : _a2["GD_R40X_" + k] : void 0;
+        return e == null ? d : Number(e);
+      };
+      const me = (_Y = full.seat) != null ? _Y : 0;
+      const rc = full.remainingSeatCounts || [];
+      if (m40 & 3 && !full.leading && full.previous && isBombLike(full.previous) && full.lastPlaySeat != null && full.lastPlaySeat % 2 !== me % 2 && ranked[0] && !isPass(ranked[0].move) && isBombLike(ranked[0].move.combo) && (ranked[0].move.cards || []).length < (full.hand || []).length && Math.min((_Z = rc[(me + 1) % 4]) != null ? _Z : 27, (__ = rc[(me + 3) % 4]) != null ? __ : 27) >= X("EN", 10) && (!(m40 & 2) || ((_$ = rc[(me + 2) % 4]) != null ? _$ : 27) >= X("PN", 8))) {
+        const top = ranked[0];
+        const alt = ranked.find((r) => isPass(r.move));
+        if (alt) {
+          alt.score = top.score + 1;
+          alt.tags = (alt.tags || []).concat("r40SaveBomb");
+          ranked.sort((a, b) => b.score - a.score);
+          best = alt.move;
+          bestTags = alt.tags;
+          bestS = alt.score;
+        }
+      }
+    }
+    {
+      const v = typeof process !== "undefined" ? (_aa = process.env) == null ? void 0 : _aa.GD_R40 : void 0;
+      const m40 = v == null ? 0 : Number(v) || 0;
+      const X = (k, d) => {
+        var _a2;
+        const e = typeof process !== "undefined" ? (_a2 = process.env) == null ? void 0 : _a2["GD_R40X_" + k] : void 0;
+        return e == null ? d : Number(e);
+      };
+      const me = (_ba = full.seat) != null ? _ba : 0;
+      const rc = full.remainingSeatCounts || [];
+      if (m40 & 4 && full.leading && ranked[0] && !isPass(ranked[0].move) && ((_ca = ranked[0].move.combo) == null ? void 0 : _ca.type) !== TYPES.SINGLE && (ranked[0].move.cards || []).length < (full.hand || []).length && ((_da = rc[(me + 2) % 4]) != null ? _da : 27) === X("PF", 3) && Math.min((_ea = rc[(me + 1) % 4]) != null ? _ea : 27, (_fa = rc[(me + 3) % 4]) != null ? _fa : 27) >= X("EN4", 6)) {
+        const top = ranked[0];
+        const lv = full.levelRank || "2";
+        const cands2 = ranked.filter((r) => {
+          var _a2;
+          return ((_a2 = r.move.combo) == null ? void 0 : _a2.type) === TYPES.SINGLE && r.score > -1e5 && r.score >= top.score - X("M4", 120) && singleStrength(r.move.combo.rank, lv) <= singleStrength("10", lv);
+        });
+        cands2.sort((a, b) => singleStrength(a.move.combo.rank, lv) - singleStrength(b.move.combo.rank, lv));
+        const alt = cands2[0];
+        if (alt) {
+          alt.score = top.score + 1;
+          alt.tags = (alt.tags || []).concat("r40FeedP3");
+          ranked.sort((a, b) => b.score - a.score);
+          best = alt.move;
+          bestTags = alt.tags;
+          bestS = alt.score;
+        }
+      }
+    }
+    {
+      const v = typeof process !== "undefined" ? (_ga = process.env) == null ? void 0 : _ga.GD_R41 : void 0;
+      const m41 = v == null ? 0 : Number(v) || 0;
+      const X = (k, d) => {
+        var _a2;
+        const e = typeof process !== "undefined" ? (_a2 = process.env) == null ? void 0 : _a2["GD_R41X_" + k] : void 0;
+        return e == null ? d : Number(e);
+      };
+      const me = (_ha = full.seat) != null ? _ha : 0;
+      const rc = full.remainingSeatCounts || [];
+      const ls = full.lastPlaySeat;
+      const left = ls != null ? (_ia = rc[ls]) != null ? _ia : 27 : 27;
+      if (m41 & 3 && !full.leading && full.previous && !isBombLike(full.previous) && ls != null && ls % 2 !== me % 2 && isPass((_ja = ranked[0]) == null ? void 0 : _ja.move) && left > 0 && left <= X("EN", 5) && (full.hand || []).length >= X("MN", 4) && (!(m41 & 2) || ((_ka = rc[(me + 2) % 4]) != null ? _ka : 0) >= 2)) {
+        const top = ranked[0];
+        const alt = ranked.find((r) => !isPass(r.move) && !isBombLike(r.move.combo) && r.score > -1e5 && r.score >= top.score - X("M", 80));
+        if (alt) {
+          alt.score = top.score + 1;
+          alt.tags = (alt.tags || []).concat("r41LateFollow");
+          ranked.sort((a, b) => b.score - a.score);
+          best = alt.move;
+          bestTags = alt.tags;
+          bestS = alt.score;
+        }
+      }
+    }
+    {
+      const v = typeof process !== "undefined" ? (_la = process.env) == null ? void 0 : _la.GD_R45 : void 0;
+      const m45 = v == null ? 2 : Number(v) || 0;
+      const me = (_ma = full.seat) != null ? _ma : 0;
+      const lvR = full.levelRank || "2";
+      if (m45 & 3 && !full.leading && full.previous && !isBombLike(full.previous) && full.lastPlaySeat != null && full.lastPlaySeat % 2 !== me % 2 && isPass((_na = ranked[0]) == null ? void 0 : _na.move)) {
+        const K = m45 & 2 ? 2 : 1;
+        const top = ranked[0];
+        const bs = ranked.filter((r) => r.score > -1e5 && !isPass(r.move) && isBombLike(r.move.combo) && (r.move.cards || []).length < (full.hand || []).length && minPlays(restAfter(full.hand, r.move), lvR) <= K);
+        bs.sort((a, b) => b.score - a.score);
+        if (bs.length) {
+          const alt = bs[0];
+          alt.score = top.score + 1;
+          alt.tags = alt.tags.concat("r45BombToExit");
+          ranked.sort((a, b) => b.score - a.score);
+          best = alt.move;
+          bestTags = alt.tags;
+          bestS = alt.score;
+        }
+      }
+    }
+    if (r31Mode() & 1 && !full.leading && full.previous && isPass((_oa = ranked[0]) == null ? void 0 : _oa.move) && full.lastPlaySeat != null && full.lastPlaySeat % 2 !== ((_pa = full.seat) != null ? _pa : 0) % 2) {
+      const left = (_qa = (full.remainingSeatCounts || [])[full.lastPlaySeat]) != null ? _qa : 27;
+      if (left > 0 && left <= R31("BK", 6)) {
+        const top = ranked[0];
+        const alt = ranked.find((r) => !isPass(r.move) && isBombLike(r.move.combo) && r.score > -1e5);
+        if (alt) {
+          alt.score = top.score + 1;
+          alt.tags = alt.tags.concat("r31BombStop");
+          ranked.sort((a, b) => b.score - a.score);
+          best = alt.move;
+          bestTags = alt.tags;
+          bestS = alt.score;
+        }
+      }
+    }
+    if (r31Mode() & 2 && full.leading && ranked[0] && isBombLike(ranked[0].move.combo) && (ranked[0].move.cards || []).length < (full.hand || []).length && liveEnemyMin(full) >= R31("EM", 10)) {
+      const top = ranked[0];
+      const alt = ranked.find((r) => !isPass(r.move) && !isBombLike(r.move.combo) && r.score > -1e5);
+      if (alt) {
+        alt.score = top.score + 1;
+        alt.tags = alt.tags.concat("r31NoLeadBomb");
+        ranked.sort((a, b) => b.score - a.score);
+        best = alt.move;
+        bestTags = alt.tags;
+        bestS = alt.score;
+      }
+    }
+    if (r31Mode() & 4 && !full.leading && full.previous && ranked[0] && !isPass(ranked[0].move) && !isBombLike(ranked[0].move.combo) && full.lastPlaySeat === (((_ra = full.seat) != null ? _ra : 0) + 2) % 4) {
+      const me = (_sa = full.seat) != null ? _sa : 0;
+      const cnts = full.remainingSeatCounts || [];
+      const pl = (_ta = cnts[(me + 2) % 4]) != null ? _ta : 27;
+      const nx = (_ua = cnts[(me + 1) % 4]) != null ? _ua : 27;
+      if (pl > 0 && pl <= R31("PK", 5) && (nx > 3 || nx === 0) && (ranked[0].move.cards || []).length < (full.hand || []).length) {
+        const top = ranked[0];
+        const alt = ranked.find((r) => isPass(r.move));
+        if (alt) {
+          alt.score = top.score + 1;
+          alt.tags = alt.tags.concat("r31YieldPartner");
+          ranked.sort((a, b) => b.score - a.score);
+          best = alt.move;
+          bestTags = alt.tags;
+          bestS = alt.score;
+        }
+      }
+    }
+    if (r31Mode() & 8 && full.leading && ranked[0] && ((_va = ranked[0].move.combo) == null ? void 0 : _va.type) === TYPES.SINGLE && (ranked[0].move.cards || []).length < (full.hand || []).length) {
+      const nx = (_xa = (full.remainingSeatCounts || [])[(((_wa = full.seat) != null ? _wa : 0) + 1) % 4]) != null ? _xa : 27;
+      if (nx > 0 && nx <= R31("NE", 1)) {
+        const top = ranked[0];
+        const alt = ranked.find((r) => {
+          var _a2;
+          return !isPass(r.move) && ((_a2 = r.move.combo) == null ? void 0 : _a2.type) !== TYPES.SINGLE && !isBombLike(r.move.combo) && r.score > -1e5;
+        });
+        if (alt) {
+          alt.score = top.score + 1;
+          alt.tags = alt.tags.concat("r31NoSingleVsAlert");
+          ranked.sort((a, b) => b.score - a.score);
+          best = alt.move;
+          bestTags = alt.tags;
+          bestS = alt.score;
+        }
+      }
+    }
+    if (r32Mode() && ranked[0] && !isPass(ranked[0].move) && !isBombLike(ranked[0].move.combo) && (ranked[0].move.cards || []).length < (full.hand || []).length) {
+      const me = (_ya = full.seat) != null ? _ya : 0;
+      const lvR = full.levelRank || "2";
+      const top = ranked[0];
+      const vsEnemy = !full.leading && full.previous && full.lastPlaySeat != null && full.lastPlaySeat % 2 !== me % 2;
+      const usesW = (r) => (r.move.cards || []).some((c) => isWildCard(c, lvR));
+      const M = R32("M", 60);
+      let alt = null, tag = "";
+      if (usesW(top) && (r32Mode() & 1 && vsEnemy || r32Mode() & 2 && full.leading)) {
+        alt = ranked.find((r) => r !== top && !isPass(r.move) && !isBombLike(r.move.combo) && r.score > -1e5 && r.score >= top.score - M && !usesW(r));
+        tag = "r32SaveWild";
+      }
+      if (!alt && r32Mode() & 4 && vsEnemy && ((_za = full.previous) == null ? void 0 : _za.type) === TYPES.SINGLE && ((_Aa = top.move.combo) == null ? void 0 : _Aa.type) === TYPES.SINGLE) {
+        const cnt = /* @__PURE__ */ new Map();
+        for (const c of full.hand || []) if (!isWildCard(c, lvR)) cnt.set(c.rank, (cnt.get(c.rank) || 0) + 1);
+        const r0 = (_Ca = (_Ba = top.move.cards) == null ? void 0 : _Ba[0]) == null ? void 0 : _Ca.rank;
+        if ((cnt.get(r0) || 0) === 2 || (cnt.get(r0) || 0) === 3) {
+          alt = ranked.find((r) => {
+            var _a2, _b2, _c2;
+            return r !== top && r.score > -1e5 && r.score >= top.score - M && ((_a2 = r.move.combo) == null ? void 0 : _a2.type) === TYPES.SINGLE && !usesW(r) && (cnt.get((_c2 = (_b2 = r.move.cards) == null ? void 0 : _b2[0]) == null ? void 0 : _c2.rank) || 0) === 1;
+          });
+          tag = "r32NoSplit";
+        }
+      }
+      if (alt) {
+        alt.score = top.score + 1;
+        alt.tags = alt.tags.concat(tag);
+        ranked.sort((a, b) => b.score - a.score);
+        best = alt.move;
+        bestTags = alt.tags;
+        bestS = alt.score;
+      }
+    }
+    {
+      const v = typeof process !== "undefined" ? (_Da = process.env) == null ? void 0 : _Da.GD_R33L : void 0;
+      const m33 = v == null ? 0 : Number(v) || 0;
+      const X = (k, d) => {
+        var _a2;
+        const e = typeof process !== "undefined" ? (_a2 = process.env) == null ? void 0 : _a2["GD_R33LX_" + k] : void 0;
+        return e == null ? d : Number(e);
+      };
+      if (m33 && full.leading && ranked[0] && (full.hand || []).length >= X("OH", 20) && [TYPES.SINGLE, TYPES.PAIR].includes((_Ea = ranked[0].move.combo) == null ? void 0 : _Ea.type)) {
+        const lvR = full.levelRank || "2";
+        const top = ranked[0];
+        const M = X("M", 60);
+        const want = /* @__PURE__ */ new Set([...m33 & 1 ? [TYPES.PAIR_SEQ, TYPES.TRIPLE_SEQ] : [], ...m33 & 2 ? [TYPES.STRAIGHT] : []]);
+        const alt = ranked.find((r) => {
+          var _a2;
+          return r.score > -1e5 && r.score >= top.score - M && want.has((_a2 = r.move.combo) == null ? void 0 : _a2.type) && !(r.move.cards || []).some((c) => isWildCard(c, lvR));
+        });
+        if (alt) {
+          alt.score = top.score + 1;
+          alt.tags = alt.tags.concat("r33OpenLead");
+          ranked.sort((a, b) => b.score - a.score);
+          best = alt.move;
+          bestTags = alt.tags;
+          bestS = alt.score;
+        }
+      }
+    }
+    if (r34Mode() & 6 && ranked[0] && ranked[0].score > -1e5 && (ranked[0].move.cards || []).length < (full.hand || []).length) {
+      const lvR = full.levelRank || "2";
+      const hand = full.hand || [];
+      const top = ranked[0];
+      const M = R34("M", 60);
+      const ids = (cs) => cs.map((c) => c.id);
+      const sfIds = (h) => {
+        var _a2;
+        const set = /* @__PURE__ */ new Set();
+        for (const m of legalMoves(h, null, lvR, true)) if (((_a2 = m.combo) == null ? void 0 : _a2.type) === TYPES.STRAIGHT_FLUSH && !m.cards.some((c) => isWildCard(c, lvR))) for (const i of ids(m.cards)) set.add(i);
+        return set;
+      };
+      let alt = null, tag = "";
+      if (r34Mode() & 2 && !isPass(top.move) && !isBombLike(top.move.combo)) {
+        const sf = sfIds(hand);
+        const breaks = (m) => (m.cards || []).some((c) => sf.has(c.id)) && sfIds(restAfter(hand, m)).size < sf.size;
+        if (sf.size && breaks(top.move)) {
+          alt = ranked.find((r) => r !== top && r.score > -1e5 && r.score >= top.score - M && !isBombLike(r.move.combo) && (!isPass(r.move) || !full.leading) && (isPass(r.move) || !breaks(r.move)));
+          tag = "r34KeepSF";
+        }
+      }
+      const ctrl = (m) => {
+        var _a2, _b2;
+        return isBombLike(m.combo) || (((_a2 = m.combo) == null ? void 0 : _a2.type) === TYPES.SINGLE || ((_b2 = m.combo) == null ? void 0 : _b2.type) === TYPES.PAIR) && m.combo.rank === "RJ";
+      };
+      if (!alt && r34Mode() & 4 && full.leading && hand.length <= 12 && ctrl(top.move)) {
+        alt = ranked.find((r) => r !== top && r.score > -1e5 && r.score >= top.score - M && !isPass(r.move) && !ctrl(r.move) && minPlays(restAfter(hand, r.move), lvR) <= 2 && legalMoves(restAfter(hand, r.move), null, lvR, true).some(ctrl));
+        tag = "r34CtrlLast";
+      }
+      if (alt) {
+        alt.score = top.score + 1;
+        alt.tags = alt.tags.concat(tag);
+        ranked.sort((a, b) => b.score - a.score);
+        best = alt.move;
+        bestTags = alt.tags;
+        bestS = alt.score;
+      }
+    }
+    {
+      const v = typeof process !== "undefined" ? (_Fa = process.env) == null ? void 0 : _Fa.GD_R35 : void 0;
+      const m35 = v == null ? 0 : Number(v) || 0;
+      const top = ranked[0];
+      if (m35 & 1 && top && top.score > -1e5 && ((_Ga = top.move.combo) == null ? void 0 : _Ga.type) === TYPES.BOMB && !top.move.combo.rocket && (top.move.cards || []).length < (full.hand || []).length) {
+        const lvR = full.levelRank || "2";
+        const hand = full.hand || [];
+        const r = top.move.combo.rank;
+        const n = top.move.cards.length;
+        const w = (m) => m.cards.filter((c) => isWildCard(c, lvR)).length;
+        const left = restAfter(hand, top.move).filter((c) => c.rank === r && !isWildCard(c, lvR)).length;
+        if (left === 1) {
+          const alt = ranked.find((x) => {
+            var _a2;
+            return x.score > -1e5 && ((_a2 = x.move.combo) == null ? void 0 : _a2.type) === TYPES.BOMB && x.move.combo.rank === r && x.move.cards.length === n + 1 && w(x.move) <= w(top.move);
+          });
+          if (alt) {
+            alt.score = top.score + 1;
+            alt.tags = alt.tags.concat("r35NoOrphan");
+            ranked.sort((a, b) => b.score - a.score);
+            best = alt.move;
+            bestTags = alt.tags;
+            bestS = alt.score;
+          }
+        }
+      }
+    }
+    {
+      const v = typeof process !== "undefined" ? (_Ha = process.env) == null ? void 0 : _Ha.GD_R36 : void 0;
+      const m36 = v == null ? 0 : Number(v) || 0;
+      const X = (k, d) => {
+        var _a2;
+        const e = typeof process !== "undefined" ? (_a2 = process.env) == null ? void 0 : _a2["GD_R36X_" + k] : void 0;
+        return e == null ? d : Number(e);
+      };
+      const top = ranked[0];
+      const hand = full.hand || [];
+      if (m36 & 4 && full.leading && top && top.score > -1e5 && hand.length >= X("OH", 20) && ((_Ia = top.move.combo) == null ? void 0 : _Ia.type) !== TYPES.SINGLE && !isBombLike(top.move.combo) && (top.move.cards || []).length < hand.length) {
+        const lvR = full.levelRank || "2";
+        const cnt = /* @__PURE__ */ new Map();
+        for (const c2 of hand) if (!isWildCard(c2, lvR)) cnt.set(c2.rank, (cnt.get(c2.rank) || 0) + 1);
+        const ok = (r) => {
+          var _a2;
+          return r.score > -1e5 && r.score >= top.score - X("M", 60) && ((_a2 = r.move.combo) == null ? void 0 : _a2.type) === TYPES.SINGLE && !isWildCard(r.move.cards[0], lvR) && !isControlRank(r.move.cards[0].rank, lvR) && (cnt.get(r.move.cards[0].rank) || 0) === 1 && singleStrength(r.move.cards[0].rank, lvR) <= singleStrength("8", lvR);
+        };
+        const c = ranked.filter(ok).sort((a, b) => singleStrength(a.move.cards[0].rank, lvR) - singleStrength(b.move.cards[0].rank, lvR));
+        if (c.length) {
+          const alt = c[0];
+          alt.score = top.score + 1;
+          alt.tags = alt.tags.concat("r36LoneLead");
+          ranked.sort((a, b) => b.score - a.score);
+          best = alt.move;
+          bestTags = alt.tags;
+          bestS = alt.score;
+        }
+      }
+    }
+    if (r28Mode() & 8 && !full.leading && ((_Ja = full.previous) == null ? void 0 : _Ja.type) === TYPES.SINGLE && ((_Ma = (_La = (_Ka = ranked[0]) == null ? void 0 : _Ka.move) == null ? void 0 : _La.combo) == null ? void 0 : _Ma.type) === TYPES.SINGLE && isJokerRank((_Oa = (_Na = ranked[0].move.cards) == null ? void 0 : _Na[0]) == null ? void 0 : _Oa.rank)) {
+      const me = (_Pa = full.seat) != null ? _Pa : 0;
       const lvR = full.levelRank || "2";
       if (full.lastPlaySeat != null && full.lastPlaySeat % 2 !== me % 2) {
         const lvCnt = (full.hand || []).filter((c) => c.rank === lvR && !isWildCard(c, lvR)).length;
@@ -3071,16 +3508,16 @@
         }
       }
     }
-    if (R7("GD_R19F", 1) && endgameApplies(full)) {
+    if (R7("GD_R19F", 1) && endgameApplies(full, r34Mode() & 1 ? R34("E", 4) : 3)) {
       const all = uniqueByCards(cands);
       const eg = solveEndgame(full, all);
-      if (eg && eg.best && eg.bestValue > ((_U = eg.values.get(mkey(best))) != null ? _U : -1e9) + 0.01) {
+      if (eg && eg.best && eg.bestValue > ((_Qa = eg.values.get(mkey(best))) != null ? _Qa : -1e9) + 0.01) {
         const before = eg.values.get(mkey(best));
         best = eg.best;
         bestTags = ["endgame"];
         full._endgame = { value: eg.bestValue, before, worlds: eg.worlds };
         const i = ranked.findIndex((r) => sameMove(r.move, best));
-        const top = (_W = (_V = ranked[0]) == null ? void 0 : _V.score) != null ? _W : 0;
+        const top = (_Sa = (_Ra = ranked[0]) == null ? void 0 : _Ra.score) != null ? _Sa : 0;
         if (i >= 0) {
           const [r] = ranked.splice(i, 1);
           r.score = top + 1;
@@ -3089,7 +3526,7 @@
         } else ranked.unshift({ move: best, score: top + 1, tags: ["endgame"] });
       }
     }
-    if (typeof process !== "undefined" && ((_X = process.env) == null ? void 0 : _X.DECIDE_DEBUG)) for (const r of ranked.slice(0, Number(process.env.DECIDE_DEBUG) > 1 ? Number(process.env.DECIDE_DEBUG) : 6)) console.error("[decide]", (_Y = r.move.combo) == null ? void 0 : _Y.type, r.move.cards.map((c) => c.rank).join(""), r.score.toFixed(1), r.tags.join(","));
+    if (typeof process !== "undefined" && ((_Ta = process.env) == null ? void 0 : _Ta.DECIDE_DEBUG)) for (const r of ranked.slice(0, Number(process.env.DECIDE_DEBUG) > 1 ? Number(process.env.DECIDE_DEBUG) : 6)) console.error("[decide]", (_Ua = r.move.combo) == null ? void 0 : _Ua.type, r.move.cards.map((c) => c.rank).join(""), r.score.toFixed(1), r.tags.join(","));
     const ms = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0;
     return {
       move: best,
@@ -3271,8 +3708,14 @@
   }
 
   // policy/tribute.js
+  var r33Mode = () => {
+    var _a;
+    const v = typeof process !== "undefined" ? (_a = process.env) == null ? void 0 : _a.GD_R33 : void 0;
+    return v == null ? 0 : Number(v) || 0;
+  };
   var DEFAULT_RETURN = "plan";
   function chooseReturn(hand, info = {}, variant = DEFAULT_RETURN) {
+    var _a, _b;
     const lv = info.lv || "2";
     const { cards } = returnOptions(hand, lv);
     if (!cards.length) return null;
@@ -3283,6 +3726,19 @@
     const pool = nonLevel.length ? nonLevel : cards;
     for (const c of pool) if (!byRank.has(c.rank)) byRank.set(c.rank, c);
     const cache = /* @__PURE__ */ new Map();
+    const r33 = String(variant).startsWith("r33_") ? Number(String(variant).slice(4)) || 0 : r33Mode();
+    if (r33) {
+      const T = Number((_b = typeof process !== "undefined" && ((_a = process.env) == null ? void 0 : _a.GD_R33X_T)) != null ? _b : 0.5);
+      const sc = [...byRank.values()].map((c) => ({ c, s: decomposeCounts(hand.filter((x) => x.id !== c.id), lv, cache).cost, str: singleStrength(c.rank, lv), nat: "23456789TJQKA".indexOf(c.rank === "10" ? "T" : c.rank) + 2 }));
+      const m = Math.min(...sc.map((x) => x.s));
+      let ok = sc.filter((x) => x.s <= m + T + 1e-9);
+      if (r33 & 2) {
+        const lo = ok.filter((x) => x.nat <= 8);
+        if (lo.length) ok = lo;
+      }
+      ok.sort((a, b) => a.str - b.str);
+      return ok[0].c;
+    }
     let best = null;
     for (const c of byRank.values()) {
       const rest = hand.filter((x) => x.id !== c.id);
