@@ -15,19 +15,23 @@
     return rank === JOKER_BLACK || rank === JOKER_RED;
   }
   function isWildCard(card2, levelRank) {
-    return !isJokerRank(card2.rank) && card2.rank === levelRank && card2.suit === "H";
+    const lv = parseLevel(levelRank);
+    return !isJokerRank(card2.rank) && String(card2.rank) === lv && card2.suit === "H";
   }
   function singleStrength(rank, levelRank) {
-    if (rank === JOKER_RED) return 100;
-    if (rank === JOKER_BLACK) return 99;
-    if (rank === levelRank) return 80;
-    const i = RANKS.indexOf(rank);
+    const r = String(rank);
+    const lv = parseLevel(levelRank);
+    if (r === JOKER_RED) return 100;
+    if (r === JOKER_BLACK) return 99;
+    if (r === lv) return 80;
+    const i = RANKS.indexOf(r);
     if (i < 0) throw new Error(`未知点数: ${rank}`);
     return i;
   }
   function parseLevel(levelRank) {
-    if (!RANKS.includes(levelRank)) throw new Error(`非法级牌: ${levelRank}`);
-    return levelRank;
+    const lv = String(levelRank);
+    if (!RANKS.includes(lv)) throw new Error(`非法级牌: ${levelRank}`);
+    return lv;
   }
 
   // engine/cards.js
@@ -440,13 +444,13 @@
     levelRank = "2",
     defenderTeam = 0
   } = {}) {
-    parseLevel(levelRank);
+    const lv = parseLevel(levelRank);
     return {
       ruleset,
       config: rulesetConfig(ruleset),
-      levelRank,
+      levelRank: lv,
       defenderTeam,
-      teamLevel: [levelRank, levelRank],
+      teamLevel: [lv, lv],
       matchOver: false,
       winnerTeam: null,
       history: []
@@ -1662,10 +1666,12 @@
     return o.reduce((b, c) => !b || singleStrength(c.rank, lv) < singleStrength(b.rank, lv) ? c : b, null);
   }
   function newStdMatch(startLevel = "2") {
-    return { teamLevel: [startLevel, startLevel], level: startLevel, levelTeam: null, matchOver: false, winnerTeam: null, prevOrder: null };
+    const lv = parseLevel(startLevel);
+    return { teamLevel: [lv, lv], level: lv, levelTeam: null, matchOver: false, winnerTeam: null, prevOrder: null };
   }
   function bump(lv, n) {
-    return RANKS[Math.min(RANKS.length - 1, RANKS.indexOf(lv) + n)];
+    const base = parseLevel(lv);
+    return RANKS[Math.min(RANKS.length - 1, RANKS.indexOf(base) + n)];
   }
   function stepsFor(order) {
     const t = teamOf2(order[0]);
@@ -9360,7 +9366,7 @@
     g.dealNo += 1;
     if (g.progression) {
       if (g.std.matchOver) g.std = newStdMatch("2");
-      g.match.levelRank = g.std.level;
+      g.match.levelRank = parseLevel(g.std.level);
       g.match.teamLevel = g.std.teamLevel.slice();
       g.match.matchOver = false;
       g.match.winnerTeam = null;
@@ -9525,7 +9531,7 @@
   }
   function interpretPlay(g, seat, cards, preferCombo = null) {
     const r = g.round;
-    const lv = g.match.levelRank;
+    const lv = parseLevel(g.match.levelRank);
     const leading = isLeading(g);
     if (!cards.length) return leading ? { ok: false, reason: "领出不能过牌" } : { ok: true, combo: { type: TYPES.PASS, rank: null, size: 0 } };
     if (!cards.every((c) => r.hands[seat].some((h) => h.id === c.id))) return { ok: false, reason: "手牌中没有这些牌" };
