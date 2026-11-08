@@ -9714,9 +9714,49 @@
     return out;
   }
 
+  // play/bot-busy.js
+  var HUMAN_SEAT = 0;
+  function shouldYieldPlayToHuman({
+    isOver: isOver2,
+    tribMode: tribMode2,
+    tributePending: tributePending2,
+    currentSeat,
+    humanSeat = HUMAN_SEAT
+  }) {
+    return isOver2 || !!tribMode2 || !!tributePending2 || currentSeat === humanSeat;
+  }
+  function humanPlayPhase({
+    isOver: isOver2,
+    tribMode: tribMode2,
+    tributePending: tributePending2,
+    currentSeat,
+    humanSeat = HUMAN_SEAT
+  }) {
+    return !isOver2 && !tribMode2 && !tributePending2 && currentSeat === humanSeat;
+  }
+  function botBusyAfterStaleCallback({
+    botBusy: botBusy2,
+    my,
+    token: token2,
+    currentSeat,
+    humanSeat = HUMAN_SEAT,
+    isOver: isOver2 = false,
+    tribMode: tribMode2 = false,
+    tributePending: tributePending2 = false
+  }) {
+    if (my !== token2 && humanPlayPhase({ isOver: isOver2, tribMode: tribMode2, tributePending: tributePending2, currentSeat, humanSeat })) {
+      return false;
+    }
+    return botBusy2;
+  }
+  function repairBotBusyForHuman(state) {
+    if (humanPlayPhase(state) && state.botBusy) return false;
+    return state.botBusy;
+  }
+
   // play/ui.js
   var $ = (id) => document.getElementById(id);
-  var HUMAN = 0;
+  var HUMAN = HUMAN_SEAT;
   var G = null;
   var token = 0;
   var selected = /* @__PURE__ */ new Set();
@@ -9794,9 +9834,30 @@
   function engineMode() {
     return $("engine").value === "jev" && jevAvailable ? "jev" : "decide";
   }
+  function abandonStaleBot(my) {
+    botBusy = botBusyAfterStaleCallback({
+      botBusy,
+      my,
+      token,
+      currentSeat: G.round.currentSeat,
+      humanSeat: HUMAN,
+      isOver: isOver(G),
+      tribMode,
+      tributePending: tributePending(G)
+    });
+    if (!botBusy) render();
+  }
   function render() {
     const r = G.round;
     const m = G.match;
+    botBusy = repairBotBusyForHuman({
+      isOver: isOver(G),
+      tribMode,
+      tributePending: tributePending(G),
+      currentSeat: r.currentSeat,
+      humanSeat: HUMAN,
+      botBusy
+    });
     $("level").textContent = m.levelRank;
     $("lvUs").textContent = m.teamLevel[0];
     $("lvThem").textContent = m.teamLevel[1];
@@ -10028,7 +10089,13 @@
   }
   function scheduleBots() {
     const my = token;
-    if (isOver(G) || tribMode || tributePending(G) || G.round.currentSeat === HUMAN) {
+    if (shouldYieldPlayToHuman({
+      isOver: isOver(G),
+      tribMode,
+      tributePending: tributePending(G),
+      currentSeat: G.round.currentSeat,
+      humanSeat: HUMAN
+    })) {
       botBusy = false;
       render();
       return;
@@ -10037,7 +10104,10 @@
     render();
     const delay = Math.max(0, Number($("speed").value) || 400);
     setTimeout(async () => {
-      if (my !== token) return;
+      if (my !== token) {
+        abandonStaleBot(my);
+        return;
+      }
       let res;
       try {
         try {
@@ -10051,7 +10121,10 @@
             res = null;
           }
         }
-        if (my !== token) return;
+        if (my !== token) {
+          abandonStaleBot(my);
+          return;
+        }
         if (!(res == null ? void 0 : res.ok)) {
           const seat = G.round.currentSeat;
           const fb = isLeading(G) ? [sortHand(G.round.hands[seat], G.match.levelRank).slice(-1)[0]] : [];
@@ -10062,6 +10135,8 @@
             botBusy = false;
             toast((res == null ? void 0 : res.reason) || "机器人出牌失败");
             render();
+          } else {
+            abandonStaleBot(my);
           }
           return;
         }
@@ -10434,6 +10509,7 @@
       return;
     }
     token += 1;
+    botBusy = false;
     G.progression = $("progression").checked;
     G.tribute = G.progression;
     startDeal(G);
